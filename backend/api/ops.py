@@ -268,9 +268,9 @@ def monitoring_detect():
     ]
 
     detected = monitoring.detect(transactions, merchants)
-    # 落库：先清空旧的演示预警，避免重复堆积
+    # 落库：先清空旧的演示预警，避免重复堆积（保留全部检测结果，便于统计处置动作分布）
     MonitoringAlert.query.delete()
-    for index, item in enumerate(detected[:80], 1):
+    for index, item in enumerate(detected[:200], 1):
         db.session.add(
             MonitoringAlert(
                 code=next_code("MON", index),
@@ -297,7 +297,7 @@ def monitoring_detect():
         "monitoring.detect", target="异常行为检测", operation="查询",
         detail=f"检测 {len(transactions)} 笔交易，生成预警 {len(detected)} 条（高危 {summary.get('high', 0)} 条）",
     )
-    return ok({"summary": summary, "alerts": detected[:60], "scanned": len(transactions)}, message="异常检测完成")
+    return ok({"summary": summary, "alerts": detected[:120], "scanned": len(transactions)}, message="异常检测完成")
 
 
 @bp.get("/monitoring/alerts")
