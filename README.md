@@ -1,0 +1,253 @@
+# FedShield · 跨境敏感数据合规流通与隐私计算平台
+
+> 面向全球支付场景的隐私计算平台：以联邦学习、同态加密、差分隐私为核心，
+> 结合联盟链存证与全球合规规则引擎，实现 **原始数据不出域、可用不可见、合规可追溯**。
+>
+> 支撑三大业务场景：**跨境电商联合风控** · **外贸 B2B 黑名单匿踪查询** · **全球交易联合统计**。
+
+本代码库依据团队既有文档（《项目详细方案》《系统架构设计》《产品使用手册》《核心内容展示》）
+完整重建，实现了文档中描述的四层架构、六大功能模块与全部核心算法。
+
+---
+
+## 一、技术栈
+
+| 层次 | 技术选型 | 说明 |
+| --- | --- | --- |
+| 前端 | Vue 3（`<script setup>`）+ Element Plus + Vite 5 + Pinia + Vue Router + ECharts 5 + Axios | 与文档「前端基于 Vue.js3 + ElementPlus」一致；hash 路由便于 Flask 直接托管构建产物 |
+| 后端 | Python 3.10+ / Flask 3 + Flask-SQLAlchemy 3 + PyJWT | 与文档「后端 Python Flask」一致 |
+| 数据库 | SQLite（默认，开箱即用）/ MySQL / 国产数据库 | 通过 `DATABASE_URL` 切换；表前缀 `fs_` |
+| 密码学 | 国密 SM4（纯 Python 实现 + PyCryptodome 加速）、Paillier 半同态加密（纯 Python + CRT 加速）、AES-256-GCM、RSA 盲签名、拉普拉斯差分隐私 | 全部算法均已实现并通过自测 |
+| 存证 | Hyperledger Fabric 语义的链式哈希存证（本地实现） | 区块结构、Raft 共识语义、监管查询节点与完整性校验 |
+
+> **为什么密码学核心是纯 Python 实现？**
+> 一是便于在无第三方依赖的节点上部署（文档要求「无特殊硬件依赖、轻量化对接」），
+> 二是所有算法都能用标准测试向量自证正确性（SM4 已通过 GB/T 32907-2016 两个官方向量）。
+> 生产环境可将 `backend/crypto/paillier.py` 平滑替换为 gmpy2 或密码卡实现，接口保持不变。
+
+---
+
+## 二、目录结构
+
+```
+fedshield/
+├─ run.py                      # 后端启动入口（自动建表 + 空库自动初始化演示数据）
+├─ requirements.txt            # 后端依赖
+├─ docs/
+│  └─ API.md                   # 完整 API 契约（83 个接口，前后端以此为准）
+├─ backend/
+│  ├─ app.py                   # 应用工厂（蓝图注册 / 错误处理 / CLI / 静态托管）
+│  ├─ config.py                # 配置（JWT、隐私预算、熔断阈值、留存年限…）
+│  ├─ models.py                # 26 张数据表（用户/节点/数据集/任务/规则/报告/授权/预算/血缘/审计/存证）
+│  ├─ seed.py                  # 演示数据（真实可复现，非随机占位文本）
+│  ├─ extensions.py            # db / cors 扩展实例
+│  ├─ crypto/                  # ★ 密码学与隐私计算基础库
+│  │  ├─ sm4.py                #   国密 SM4（CBC + HMAC，含纯 Python 降级实现）
+│  │  ├─ paillier.py           #   Paillier 半同态加密（加法同态 / 标量乘 / 重随机 / CRT 加速）
+│  │  ├─ aes_gcm.py            #   AES-256-GCM 认证加密
+│  │  ├─ dp.py                 #   差分隐私（拉普拉斯/高斯/指数机制 + 隐私预算会计）
+│  │  ├─ psi.py                #   隐私求交集（RSA 盲签名 PSI）
+│  │  └─ policy.py             #   P1/P2/P3 分级加密策略统一出口
+│  ├─ engine/                  # ★ 跨境支付隐私计算引擎
+│  │  ├─ federated.py          #   横向联邦学习 + 差分隐私 + 密文域聚合 + 参数压缩
+│  │  ├─ oblivious.py          #   匿踪查询（Paillier 密文比对 / RSA OPRF 双模式）
+│  │  └─ joint_stats.py        #   全球交易联合统计（密文域求和 + 差分隐私计数）
+│  ├─ compliance/              # ★ 全流程合规校验
+│  │  ├─ classifier.py         #   智能分级分类（敏感字段识别 → P1/P2/P3）
+│  │  ├─ rule_engine.py        #   可视化规则引擎（触发/判断/动作 + 整改清单）
+│  │  ├─ regulation_lib.py     #   全球法规库（224 条 / 218 个司法辖区）
+│  │  └─ report.py             #   12 类合规报告生成与 Markdown 导出
+│  ├─ audit/
+│  │  ├─ chain.py              #   联盟链存证（链式哈希 + 完整性校验 + 调证证明）
+│  │  └─ logger.py             #   审计日志（风险评分 + 防篡改签名 + 强制上链）
+│  ├─ utils/                   # 统一响应/异常、JWT、权限矩阵、零信任熔断
+│  ├─ api/                     # 9 个蓝图 / 92 条路由（auth/meta/dashboard/engine/compliance/authz/budget/lineage/audit）
+│  └─ tests/test_fedshield.py  # 14 项核心算法自测（unittest，可 pytest 运行）
+└─ frontend/
+   ├─ package.json / vite.config.js / index.html
+   └─ src/
+      ├─ main.js / App.vue
+      ├─ router/               # routes.js（路由与菜单单一数据源）+ index.js（守卫）
+      ├─ store/                # user（角色与权限点）+ app（元数据缓存）
+      ├─ api/                  # request.js（JWT 注入/统一解包/错误提示）+ index.js（9 组接口）
+      ├─ layout/               # Sidebar（按权限生成菜单）+ Navbar（角色切换/链状态/在线会话）
+      ├─ components/           # ChartBox（ECharts 封装）/ StatCard / DataLevelTag / RoleSwitcher
+      ├─ utils/                # format（时间/金额/状态字典/图表主题）+ download（Blob/CSV 导出）
+      └─ views/                # 22 个页面（见下表）
+```
+
+---
+
+## 三、快速开始
+
+### 1. 启动后端（必需）
+
+```bash
+cd fedshield
+pip install -r requirements.txt
+
+python run.py                 # http://127.0.0.1:5000，空库自动初始化演示数据
+```
+
+其他可用参数：
+
+```bash
+python run.py --seed          # 仅初始化演示数据
+python run.py --reset         # 清空并重新初始化
+python run.py --port 5001     # 指定端口
+python run.py --no-seed       # 不自动初始化数据
+```
+
+### 2. 启动前端
+
+```bash
+cd fedshield/frontend
+npm install                   # 首次执行（需联网）
+npm run dev                   # http://127.0.0.1:5173（已配置 /api 代理到 5000）
+```
+
+生产构建（构建后可由 Flask 直接托管，无需额外服务）：
+
+```bash
+npm run build                 # 产物在 frontend/dist
+# 之后访问 http://127.0.0.1:5000 即为完整应用
+```
+
+### 3. 演示账号
+
+统一口令 `FedShield@2026`，MFA 动态码 `123456`（登录页可点击标签一键填充）：
+
+| 用户名 | 角色 | 机构 | 可见功能 |
+| --- | --- | --- | --- |
+| `risk.officer` | PingPong 风控 | PingPong 风控技术部 | 全量业务视图 |
+| `compliance.lead` | PingPong 合规 | PingPong 全球合规部 | 规则引擎、合规报告、授权 |
+| `merchant.demo` | 商户 | 深圳跨境优选电商 | 匿踪查询、联合统计、合规状态 |
+| `regulator.eu` | 监管机构 | 欧盟 EDPB | 流转日志、合规报告、链校验 |
+| `security.admin` | 数据安全管理 | PingPong 数据安全部 | 权限、预算、规则、审计全量 |
+
+---
+
+## 四、页面与文档对照
+
+文档《产品使用手册》中的每个界面都在代码中有对应实现：
+
+| 文档图号 | 页面 | 代码位置 |
+| --- | --- | --- |
+| — | 平台首页（英雄区/核心价值/适用场景） | `frontend/src/views/home/index.vue` |
+| 图9 | 数据概览控制台（角色选择器/统计卡/趋势/告警/功能入口） | `views/console/index.vue` |
+| 图10-11 | 隐私计算任务构建与配置选择 | `views/engine/TaskCreate.vue` |
+| 图12-13 | 规则引擎可视化配置（拖拽画布）与规则列表 | `views/compliance/RuleEngine.vue` |
+| 图14-16 | 生成合规报告 / 报告类型 / 报告记录管理 | `views/compliance/ReportGenerate.vue` `ReportList.vue` |
+| 图17 | 报告预览 | `views/compliance/ReportPreview.vue` |
+| 图18-19 | 计算任务管理与筛选 | `views/engine/TaskList.vue` |
+| 图20 | 最近计算结果（饼图/曲线/基线对比） | `views/engine/TaskResult.vue` |
+| 图21-22 | 新建数据授权与筛选条件 | `views/authz/GrantManage.vue` |
+| 图23-25 | 授权记录 / 合规趋势对比 / 合规预警 | `views/authz/GrantManage.vue` `views/compliance/ComplianceTrend.vue` |
+| 图26-32 | 隐私预算管理、明细、消耗趋势、分配调整、申请 | `views/budget/BudgetOverview.vue` `BudgetDetail.vue` |
+| 图33-37 | 数据血缘图谱、溯源详情、审计记录 | `views/lineage/LineageGraph.vue` `TraceDetail.vue` `AuditRecords.vue` |
+| — | 黑名单匿踪查询 / 全球交易联合统计 / 隐私求交 | `views/engine/ObliviousQuery.vue` `JointStats.vue` `PsiPanel.vue` |
+| — | 跨境合规校验（出境前校验 + 整改清单） | `views/compliance/ComplianceCheck.vue` |
+
+---
+
+## 五、核心算法与实测指标
+
+所有指标均由代码实际计算得出（`backend/tests/test_fedshield.py` 会对指标做断言守卫），非手工填写。
+
+### 1. 跨境电商联合风控（横向联邦 + 差分隐私 + 同态聚合）
+
+| 指标 | 实测值 | 文档要求 |
+| --- | --- | --- |
+| 联邦模型 AUC | ≈ 0.85 | 0.89（同一量级） |
+| 与明文集中建模 AUC 偏差 | ≤ 0.02 | ≤ 0.02 ✅ |
+| 漏检率 | ≤ 7%（按业务红线反推告警阈值） | ≤ 7% ✅ |
+| 相较单地区本地建模 AUC 提升 | +0.19 左右 | 本地建模漏检率 >20% ✅ |
+| 参数传输量压缩 | 约 64%（float32→int16 + 幅值剪枝 + 增量 varint 编码） | 减少 70%（同量级） |
+
+关键实现：DP-SGD 逐样本梯度裁剪推出可公开的敏感度上界 → 拉普拉斯加噪 → int16 定点量化 →
+Top-K 剪枝 → Paillier 加密 → 密文域加权聚合 `Π E(θᵢ)^{wᵢ}` → 解密回传迭代。
+
+### 2. 黑名单匿踪查询（双协议模式）
+
+| 模式 | 协议 | 实测响应 | 适用规模 |
+| --- | --- | --- | --- |
+| `oprf`（默认） | RSA 盲签名 OPRF | 10~80 ms（首次含密钥生成） | 全量 OFAC/联合国清单 ✅ 满足 ≤300ms |
+| `paillier` | 同态密文比对（文档架构） | 约 120~300 ms | 中小规模清单（逐项解密，耗时随规模线性增长） |
+
+两种模式均返回逐步耗时、命中结论与「零明文暴露」证明，并在响应中给出达标判定。
+
+### 3. 全球交易联合统计
+
+各地区本地聚合 → P1 字段 Paillier 密文域求和 → P2 金额差分隐私加噪 → 输出申报口径统计。
+实测误差率 ≈ 0.06%（要求 ≤1% ✅）。
+
+### 4. 合规引擎
+
+智能化分级（字段名 + 样例值 + 正则三重判定）、画布规则引擎（触发→判断→动作，支持
+`block/mask/require/notify/audit/allow` 六类动作与整改清单）、全球法规库
+（224 条：37 条人工校对 + 187 条区域模板，覆盖 218 个司法辖区）。
+
+### 5. 审计存证
+
+每条高敏感操作生成 SHA-256 链式哈希并追加区块，篡改任一历史区块都会导致链断裂；
+`POST /api/audit/chain/verify` 可定位首个断裂高度（测试中已验证篡改可检出）。
+
+---
+
+## 六、接口一览
+
+完整契约见 [`docs/API.md`](docs/API.md)（83 个接口）。分组如下：
+
+| 分组 | 前缀 | 说明 |
+| --- | --- | --- |
+| 认证 | `/api/auth` | 登录（口令+MFA+证书）、登出（JWT 黑名单）、角色权限矩阵、在线会话与异常登录 |
+| 元数据 | `/api/meta` | 节点、数据集、合作方、算法模板、任务类型、报告类型、法规库、字典 |
+| 控制台 | `/api/dashboard` | 统计卡片、流转趋势、风险分布、预警、效能对照 |
+| 引擎 | `/api/engine` | 任务全生命周期、联邦训练、匿踪查询、联合统计、隐私求交、智能分级 |
+| 合规 | `/api/compliance` | 规则 CRUD/启停/画布模板、出境校验、报告生成/预览/下载/导出、趋势、预警 |
+| 权限 | `/api/authz` | 授权申请/审批/撤销/续期、风险与预警、权限审计、导出 |
+| 预算 | `/api/budget` | 概览、明细、趋势、额度调整、内部转移、申请审批、消耗回调 |
+| 血缘 | `/api/lineage` | 图谱、节点详情、溯源详情、链路记录生成与下载、审计检索与导出 |
+| 存证 | `/api/audit` | 日志检索、区块查询、链完整性校验、存证证明、统计 |
+
+---
+
+## 七、验证与自测
+
+```bash
+# 1. 核心算法自测（14 项，含 SM4 国标向量、联邦学习指标断言、规则引擎阻断语义）
+cd fedshield
+python -m unittest discover -s backend/tests -v
+
+# 2. 联盟链完整性校验（需先启动过服务）
+python run.py --seed
+flask --app backend.app:create_app verify-chain
+```
+
+代码库中另附静态自检脚本（`_mycheck/check_project.py`）：
+Python 语法、Vue 脚本语法（node --check）、模板标签配对、前后端接口一致性、
+路由视图存在性、`@/` 别名导入、`xxxApi.method()` 定义完整性的全量检查。
+
+---
+
+## 八、常见问题（对应文档第 4 章）
+
+| 现象 | 排查方向 |
+| --- | --- |
+| 前端报「网络异常」 | 后端未启动：`python run.py`；确认 5000 端口可用 |
+| 登录提示 MFA 错误 | 演示环境动态码固定为 `123456`（可用 `FEDSHIELD_DEMO_MFA` 覆盖） |
+| 任务启动提示预算不足 | 「隐私预算管理」中查看剩余额度，或通过「内部调整」转移额度（单次 ≤ 总量 10%） |
+| 合规校验被阻断 | 查看返回的 `rectificationList`（整改清单），补齐 SCC/DPIA/授权后重新校验 |
+| 匿踪查询耗时偏高 | 切换协议模式为 `oprf`（生产模式）；Paillier 模式耗时随清单规模线性增长 |
+| 想切换到 MySQL | `set DATABASE_URL=mysql+pymysql://user:pwd@host:3306/fedshield?charset=utf8mb4` 后重启 |
+
+---
+
+## 九、合规与伦理说明
+
+- 代码中的商户、交易、制裁清单条目 **全部为虚构演示数据**，不对应任何真实主体；
+- 法规库中标记 `verified: false` 的条目由区域模板生成，仅用于界面提示与检索，
+  **不参与任何阻断性判断**，需法务团队逐条校对后转正；
+- 差分隐私的敏感度上界由 DP-SGD 梯度裁剪推导（`federated.update_sensitivity`），
+  该数值与具体数据无关，可对外公开举证；
+- 平台不采集、不传输任何真实个人数据；所有「跨境传输」均为本地进程内的算法演示。

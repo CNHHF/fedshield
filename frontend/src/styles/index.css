@@ -1,0 +1,213 @@
+/* FedShield 全局样式（Element Plus 之上的业务定制层） */
+
+:root {
+  --fs-primary: #1f5fd8;
+  --fs-primary-light: #e8f0fe;
+  --fs-success: #14a37f;
+  --fs-warning: #f5a623;
+  --fs-danger: #e5484d;
+  --fs-text: #1f2733;
+  --fs-text-secondary: #5c6b7f;
+  --fs-border: #e4e8ef;
+  --fs-bg: #f4f6fa;
+  --fs-card-radius: 10px;
+  --fs-shadow: 0 2px 10px rgba(31, 39, 51, 0.06);
+  --fs-sidebar-bg: #101a2c;
+  --fs-sidebar-text: #b6c2d4;
+
+  --el-color-primary: #1f5fd8;
+  --el-color-success: #14a37f;
+  --el-color-warning: #f5a623;
+  --el-color-danger: #e5484d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--fs-bg);
+  color: var(--fs-text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--fs-primary);
+  text-decoration: none;
+}
+
+/* ---------------- 启动占位 ---------------- */
+.app-loading {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--fs-text-secondary);
+}
+.app-loading__spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--fs-primary-light);
+  border-top-color: var(--fs-primary);
+  animation: fs-spin 0.9s linear infinite;
+}
+@keyframes fs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------- 通用布局 ---------------- */
+.fs-page {
+  padding: 18px 20px 28px;
+}
+.fs-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.fs-page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.fs-page__subtitle {
+  margin: 6px 0 0;
+  color: var(--fs-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.fs-card {
+  background: #fff;
+  border-radius: var(--fs-card-radius);
+  box-shadow: var(--fs-shadow);
+  border: 1px solid var(--fs-border);
+}
+.fs-card + .fs-card {
+  margin-top: 16px;
+}
+.fs-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--fs-border);
+}
+.fs-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fs-card__title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--fs-primary);
+}
+.fs-card__body {
+  padding: 18px;
+}
+.fs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.fs-toolbar__right {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+.fs-muted {
+  color: var(--fs-text-secondary);
+  font-size: 12px;
+}
+.fs-mono {
+  font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+}
+.fs-grid {
+  display: grid;
+  gap: 16px;
+}
+.fs-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fs-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.fs-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .fs-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1024px) {
+  .fs-grid--2,
+  .fs-grid--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------- 表格与标签 ---------------- */
+.el-table th.el-table__cell {
+  background: #f7f9fc !important;
+  color: var(--fs-text) !important;
+  font-weight: 600;
+}
+.el-table .cell {
+  line-height: 1.5;
+}
+.fs-tag--p1 {
+  --el-tag-bg-color: #fdecec;
+  --el-tag-border-color: #f7c5c6;
+  --el-tag-text-color: #c02a2f;
+}
+.fs-tag--p2 {
+  --el-tag-bg-color: #fff5e6;
+  --el-tag-border-color: #ffdcae;
+  --el-tag-text-color: #b5761a;
+}
+.fs-tag--p3 {
+  --el-tag-bg-color: #eaf5f1;
+  --el-tag-border-color: #b9e0d4;
+  --el-tag-text-color: #0f7f63;
+}
+
+/* ---------------- 滚动条 ---------------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9d2e0;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #aab6c8;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

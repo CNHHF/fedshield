@@ -1,0 +1,17 @@
+# FedShield 后端依赖（Python 3.10+）
+# 安装：pip install -r requirements.txt
+# 说明：SQLite 为默认数据库，开箱即用；如需切换 MySQL 请取消注释 PyMySQL 并配置 DATABASE_URL
+
+Flask==3.0.3
+Flask-Cors==4.0.1
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.32
+PyJWT==2.9.0
+pycryptodome==3.20.0
+numpy==1.26.4
+python-dateutil==2.9.0.post0
+
+# MySQL / 国产数据库驱动（按需启用）
+# PyMySQL==1.1.1
+# dmPython==2.5.5          # 达梦数据库
+# psycopg2-binary==2.9.9   # openGauss / PostgreSQL
