@@ -1,4 +1,4 @@
-# FedShield · AI 风控合规智能大脑（面向全球支付场景的一体化智能支撑体系）
+﻿# FedShield · AI 风控合规智能大脑（面向全球支付场景的一体化智能支撑体系）
 
 > 赛题 **A16【面向全球支付场景的 AI 驱动风控合规智能大脑框架】（乒乓智能）** 参赛作品。
 >
@@ -252,7 +252,7 @@ python run.py --seed
 flask --app backend.app:create_app verify-chain
 ```
 
-代码库中另附静态自检脚本（`_mycheck/check_project.py`）：
+代码库中另附静态自检脚本（`tools/check_project.py`，随仓库分发）：
 Python 语法、Vue 脚本语法（node --check）、模板标签配对、前后端接口一致性、
 路由视图存在性、`@/` 别名导入、`xxxApi.method()` 定义完整性的全量检查。
 

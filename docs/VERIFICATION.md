@@ -1,4 +1,4 @@
-# 交付验证报告
+﻿# 交付验证报告
 
 本文件记录本次代码重建的**验证范围、验证方式与未验证项**，便于团队与评委核验。
 
@@ -71,7 +71,7 @@ AUC=0.8488、漏检率 6.98%、与明文偏差 0.0062、密文聚合 280 份、�
 ### 1. 静态自检脚本
 
 ```bash
-python _mycheck/check_project.py all
+python tools/check_project.py all
 ```
 
 覆盖：Python 语法、Vue/JS 语法（`node --check`）、模板标签配对、前后端路由一致性、
@@ -80,7 +80,7 @@ python _mycheck/check_project.py all
 ### 2. 后端导入期冒烟测试
 
 ```bash
-python _mycheck/smoke_backend.py
+python tools/e2e_backend.py
 ```
 
 由于本机无 Flask/SQLAlchemy，`_testdoubles/` 目录提供了仅覆盖**导入期与注册期** API 形状的
@@ -95,7 +95,7 @@ python _mycheck/smoke_backend.py
   差分隐私、SM4/Paillier/PSI、匿踪查询双模式、联合统计、链式哈希。
 
 > ⚠️ 替身仅用于本机验证，**不属于交付代码**，正式运行必须安装 `requirements.txt`。
-> 删除 `_testdoubles/` 与 `_mycheck/` 不影响平台运行。
+> 验证脚本已随仓库分发在 `tools/` 目录（相对路径实现，克隆后可直接执行）。
 
 ### 3. 项目内置单元测试
 
