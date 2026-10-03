@@ -36,3 +36,6 @@ Thumbs.db
 *.pem
 *.key
 instance/paillier_keys.json
+
+# ---------------- 参赛交付文档（含团队成员姓名与学号，仅本地留存，不进公开仓库） ----------------
+docs/交付材料/
