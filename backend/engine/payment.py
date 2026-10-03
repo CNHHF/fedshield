@@ -354,9 +354,16 @@ def summarize(orders: Sequence[dict]) -> Dict[str, object]:
         bucket["count"] += 1
         bucket["amount"] += item["amount"]
 
+    # 逐状态计数（供前端绘制精确的状态分布图，而不是只给 4 个合并桶）
+    status_counts: Dict[str, int] = {}
+    for item in orders:
+        status_counts[item["status"]] = status_counts.get(item["status"], 0) + 1
+
     durations = [item["durationMs"] for item in orders if item["durationMs"]]
     return {
         "total": total,
+        "countedOrders": total,
+        "scope": f"最近 {total} 笔订单（统计上限 500 笔）",
         "processedCount": processed,
         "successCount": len(success),
         "failedCount": len(failed),
@@ -371,6 +378,10 @@ def summarize(orders: Sequence[dict]) -> Dict[str, object]:
         "p95DurationMs": sorted(durations)[int(len(durations) * 0.95) - 1] if len(durations) > 1 else 0,
         "totalAmount": round(sum(item["amount"] for item in orders), 2),
         "channelDistribution": sorted(channel_distribution.values(), key=lambda item: -item["count"]),
+        "statusDistribution": sorted(
+            [{"status": key, "count": value} for key, value in status_counts.items()],
+            key=lambda item: -item["count"],
+        ),
         # 自动化率 = 无需人工介入即可闭环的比例（成功 + 失败补偿 + 风控自动拦截）
         "automationRate": round((len(success) + len(compensated) + len(blocked)) / total, 4),
     }

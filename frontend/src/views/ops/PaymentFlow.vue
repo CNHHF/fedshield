@@ -484,6 +484,7 @@
       <div class="fs-card">
         <div class="fs-card__header">
           <span class="fs-card__title">订单状态分布</span>
+          <span v-if="summary.scope" class="fs-muted">{{ summary.scope }}</span>
           <span class="fs-muted">成功 / 失败补偿 / 风控拦截 / 转人工</span>
         </div>
         <div class="fs-card__body">
@@ -881,16 +882,52 @@ const channelOption = computed(() => {
   })
 })
 
-/** 环形饼图：订单状态分布（取自 summary 的全量口径计数） */
+/** 环形饼图：订单状态分布
+ *  优先使用后端返回的逐状态计数 statusDistribution（精确到 10 个状态）；
+ *  若后端未提供该字段，则退化为 4 个合并桶，保证图表始终可渲染。
+ */
+const STATUS_LABELS = {
+  received: '已接入',
+  risk_checked: '风控已校验',
+  routed: '已路由',
+  processing: '处理中',
+  success: '成功',
+  retrying: '重试后成功',
+  failed: '失败',
+  compensated: '已自动补偿',
+  blocked: '风控拦截',
+  manual: '转人工审核'
+}
+const STATUS_COLORS = {
+  success: '#14a37f',
+  retrying: '#0ea5e9',
+  compensated: '#8b5cf6',
+  failed: '#e5484d',
+  blocked: '#e5484d',
+  manual: '#f5a623'
+}
+
 const statusPieOption = computed(() => {
-  const list = [
-    { name: '成功（含重试后成功）', value: Number(summary.value.successCount || 0) },
-    { name: '失败 / 已自动补偿', value: Number(summary.value.failedCount || 0) },
-    { name: '风控拦截', value: Number(summary.value.blockedCount || 0) },
-    { name: '转人工审核', value: Number(summary.value.manualCount || 0) }
-  ].filter((item) => item.value > 0)
+  const distribution = Array.isArray(summary.value.statusDistribution) ? summary.value.statusDistribution : []
+  let list = distribution
+    .filter((item) => Number(item.count || 0) > 0)
+    .map((item) => ({
+      name: `${STATUS_LABELS[item.status] || item.status}（${item.status}）`,
+      value: Number(item.count || 0),
+      itemStyle: STATUS_COLORS[item.status] ? { color: STATUS_COLORS[item.status] } : undefined
+    }))
+
+  if (!list.length) {
+    list = [
+      { name: '成功（含重试后成功）', value: Number(summary.value.successCount || 0) },
+      { name: '失败 / 已自动补偿', value: Number(summary.value.failedCount || 0) },
+      { name: '风控拦截', value: Number(summary.value.blockedCount || 0) },
+      { name: '转人工审核', value: Number(summary.value.manualCount || 0) }
+    ].filter((item) => item.value > 0)
+  }
+
   return {
-    color: ['#14a37f', '#e5484d', '#f5a623', '#8b5cf6'],
+    color: ['#14a37f', '#0ea5e9', '#8b5cf6', '#e5484d', '#f5a623', '#1f5fd8', '#64748b'],
     tooltip: { trigger: 'item', formatter: '{b}：{c} 笔（{d}%）' },
     legend: { bottom: 0, icon: 'circle', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 12 } },
     series: [
