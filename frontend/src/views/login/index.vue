@@ -151,8 +151,8 @@ async function onSubmit() {
   loading.value = true
   try {
     await userStore.login({ ...form })
-    ElMessage.success('登录成功，正在进入控制台')
-    router.push(route.query.redirect || '/console')
+    ElMessage.success('登录成功，正在进入 AI 风控大脑')
+    router.push(route.query.redirect || '/brain')
   } catch (error) {
     // 错误提示已由 axios 拦截器统一处理
   } finally {

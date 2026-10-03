@@ -26,6 +26,9 @@ bp = Blueprint("dashboard", __name__, url_prefix="/api/dashboard")
 
 # 不同角色看到的功能入口不同（前端「功能模块区」快捷访问）
 MODULES = [
+    {"key": "brain.overview", "title": "AI 风控大脑", "path": "/brain", "icon": "Cpu",
+     "desc": "脑机结构数据流展板：感知→脑区→决策全链路可视化",
+     "roles": ["pingpong", "merchant", "regulator", "admin"]},
     {"key": "engine.tasks", "title": "计算任务管理", "path": "/engine/tasks", "icon": "List",
      "desc": "任务创建、启动、暂停与结果追溯", "roles": ["pingpong", "admin"]},
     {"key": "engine.query", "title": "黑名单匿踪查询", "path": "/engine/query", "icon": "Search",

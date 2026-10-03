@@ -1,9 +1,14 @@
-# FedShield · 跨境敏感数据合规流通与隐私计算平台
+﻿# FedShield · AI 风控合规智能大脑（跨境敏感数据合规流通与隐私计算平台）
 
-> 面向全球支付场景的隐私计算平台：以联邦学习、同态加密、差分隐私为核心，
-> 结合联盟链存证与全球合规规则引擎，实现 **原始数据不出域、可用不可见、合规可追溯**。
+> 面向赛题「**面向全球支付场景的 AI 驱动风控合规智能大脑框架**」：
+> 以「感知输入 → 脑区计算 → 决策输出」的脑机结构统一调度联邦学习、同态加密、差分隐私、
+> 合规规则引擎与联盟链存证，实现 **原始数据不出域、可用不可见、合规可追溯**。
 >
 > 支撑三大业务场景：**跨境电商联合风控** · **外贸 B2B 黑名单匿踪查询** · **全球交易联合统计**。
+
+平台核心是 **AI 风控大脑数据流展板**（`/brain`）：13 个脑区按三层结构排布，
+数据脉冲沿 19 条通路在「感知 → 计算 → 决策」之间流动，脑区负载、脉冲强度与审计事件
+全部由真实业务指标驱动，而非静态示意图。
 
 本代码库依据团队既有文档（《项目详细方案》《系统架构设计》《产品使用手册》《核心内容展示》）
 完整重建，实现了文档中描述的四层架构、六大功能模块与全部核心算法。
@@ -34,7 +39,7 @@ fedshield/
 ├─ run.py                      # 后端启动入口（自动建表 + 空库自动初始化演示数据）
 ├─ requirements.txt            # 后端依赖
 ├─ docs/
-│  └─ API.md                   # 完整 API 契约（83 个接口，前后端以此为准）
+│  └─ API.md                   # 完整 API 契约（85 个接口，前后端以此为准）
 ├─ backend/
 │  ├─ app.py                   # 应用工厂（蓝图注册 / 错误处理 / CLI / 静态托管）
 │  ├─ config.py                # 配置（JWT、隐私预算、熔断阈值、留存年限…）
@@ -61,7 +66,7 @@ fedshield/
 │  │  ├─ chain.py              #   联盟链存证（链式哈希 + 完整性校验 + 调证证明）
 │  │  └─ logger.py             #   审计日志（风险评分 + 防篡改签名 + 强制上链）
 │  ├─ utils/                   # 统一响应/异常、JWT、权限矩阵、零信任熔断
-│  ├─ api/                     # 9 个蓝图 / 92 条路由（auth/meta/dashboard/engine/compliance/authz/budget/lineage/audit）
+│  ├─ api/                     # 10 个蓝图 / 94 条路由（auth/meta/dashboard/brain/engine/compliance/authz/budget/lineage/audit）
 │  └─ tests/test_fedshield.py  # 14 项核心算法自测（unittest，可 pytest 运行）
 └─ frontend/
    ├─ package.json / vite.config.js / index.html
@@ -73,7 +78,7 @@ fedshield/
       ├─ layout/               # Sidebar（按权限生成菜单）+ Navbar（角色切换/链状态/在线会话）
       ├─ components/           # ChartBox（ECharts 封装）/ StatCard / DataLevelTag / RoleSwitcher
       ├─ utils/                # format（时间/金额/状态字典/图表主题）+ download（Blob/CSV 导出）
-      └─ views/                # 22 个页面（见下表）
+      └─ views/                # 23 个页面（见下表）
 ```
 
 ---
@@ -133,7 +138,8 @@ npm run build                 # 产物在 frontend/dist
 
 | 文档图号 | 页面 | 代码位置 |
 | --- | --- | --- |
-| — | 平台首页（英雄区/核心价值/适用场景） | `frontend/src/views/home/index.vue` |
+| — | **AI 风控大脑数据流展板（脑机结构 · 平台核心页）** | `frontend/src/views/brain/index.vue` |
+| — | 平台首页（英雄区/智能大脑结构/核心价值/适用场景） | `frontend/src/views/home/index.vue` |
 | 图9 | 数据概览控制台（角色选择器/统计卡/趋势/告警/功能入口） | `views/console/index.vue` |
 | 图10-11 | 隐私计算任务构建与配置选择 | `views/engine/TaskCreate.vue` |
 | 图12-13 | 规则引擎可视化配置（拖拽画布）与规则列表 | `views/compliance/RuleEngine.vue` |
@@ -196,13 +202,14 @@ Top-K 剪枝 → Paillier 加密 → 密文域加权聚合 `Π E(θᵢ)^{wᵢ}` 
 
 ## 六、接口一览
 
-完整契约见 [`docs/API.md`](docs/API.md)（83 个接口）。分组如下：
+完整契约见 [`docs/API.md`](docs/API.md)（85 个接口）。分组如下：
 
 | 分组 | 前缀 | 说明 |
 | --- | --- | --- |
 | 认证 | `/api/auth` | 登录（口令+MFA+证书）、登出（JWT 黑名单）、角色权限矩阵、在线会话与异常登录 |
 | 元数据 | `/api/meta` | 节点、数据集、合作方、算法模板、任务类型、报告类型、法规库、字典 |
 | 控制台 | `/api/dashboard` | 统计卡片、流转趋势、风险分布、预警、效能对照 |
+| **智能大脑** | `/api/brain` | **脑区图谱、数据通路、大脑 KPI、实时脉冲事件** |
 | 引擎 | `/api/engine` | 任务全生命周期、联邦训练、匿踪查询、联合统计、隐私求交、智能分级 |
 | 合规 | `/api/compliance` | 规则 CRUD/启停/画布模板、出境校验、报告生成/预览/下载/导出、趋势、预警 |
 | 权限 | `/api/authz` | 授权申请/审批/撤销/续期、风险与预警、权限审计、导出 |

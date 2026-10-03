@@ -5,7 +5,7 @@
         <component :is="collapsed ? 'Expand' : 'Fold'" />
       </el-icon>
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/console' }">FedShield</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/brain' }">FedShield</el-breadcrumb-item>
         <el-breadcrumb-item v-if="currentGroup">{{ currentGroup }}</el-breadcrumb-item>
         <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
       </el-breadcrumb>
@@ -126,7 +126,7 @@ const sessionLoading = ref(false)
 const sessions = ref([])
 const chainValid = ref(null)
 
-const currentTitle = computed(() => route.meta?.title || '数据概览控制台')
+const currentTitle = computed(() => route.meta?.title || 'AI 风控大脑')
 const currentGroup = computed(() => route.meta?.group || '')
 const avatarText = computed(() => (userStore.displayName || 'U').slice(0, 1).toUpperCase())
 

@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from flask import Flask
 
-from . import audit, auth, authz, budget, compliance, dashboard, engine, lineage, meta
+from . import audit, auth, authz, brain, budget, compliance, dashboard, engine, lineage, meta
 
 
 def register_blueprints(app: Flask) -> None:
     """注册全部业务蓝图（统一 /api 前缀）。"""
-    for module in (auth, meta, dashboard, engine, compliance, authz, budget, lineage, audit):
+    for module in (auth, meta, dashboard, brain, engine, compliance, authz, budget, lineage, audit):
         app.register_blueprint(module.bp)
 
 

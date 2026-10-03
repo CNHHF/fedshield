@@ -105,6 +105,50 @@ JWT 载荷：`{ sub: username, role: <role>, org: <org>, exp, iat, jti }`；角�
 
 ---
 
+## 3.5 AI 风控合规智能大脑 `/api/brain`
+
+对应赛题「面向全球支付场景的 AI 驱动风控合规智能大脑框架」，把平台模块映射为**脑区图谱**
+（感知输入层 → 脑区计算层 → 决策输出层），并以真实业务指标驱动数据流动画。
+
+| 方法 | 路径 | 说明 | 响应 data |
+| --- | --- | --- | --- |
+| GET | `/api/brain/overview` | 大脑总览：脑区 + 数据通路 + KPI + 实时脉冲 | 见下 |
+| GET | `/api/brain/atlas` | 脑区图谱静态定义（坐标、分组、通路） | `{canvas, regions, flows, groups}` |
+
+`/api/brain/overview` 响应结构：
+
+```json
+{
+  "canvas": { "width": 1000, "height": 620 },
+  "title": "AI 风控合规智能大脑",
+  "groups": [{ "code": "sensory", "name": "感知输入层" }],
+  "regions": [
+    {
+      "id": "core_risk", "name": "联合风控决策核", "group": "cortex", "groupLabel": "脑区计算层",
+      "x": 372, "y": 158, "desc": "横向联邦学习联合建模，输出风险评分与标签",
+      "load": 0.42, "status": "active", "symbolSize": 36.9,
+      "metrics": [{ "label": "建模任务", "value": "3/4", "unit": "完成/总" }]
+    }
+  ],
+  "flows": [
+    { "source": "core_crypto", "target": "core_risk", "label": "密文聚合",
+      "value": 0.63, "throughput": 193 }
+  ],
+  "kpis": [{ "key": "regions", "label": "在线脑区", "value": 13, "unit": "个", "sub": "感知 4 · 计算 6 · 输出 3" }],
+  "events": [{ "ts": "15:20:31", "actor": "risk.officer", "action": "task.finish",
+               "target": "TASK-20261003-0001", "result": "success", "chainTxId": "tx-..." }],
+  "performance": [{ "label": "密文聚合耗时", "value": 1032.95, "unit": "ms" }],
+  "updatedAt": "2026-10-03 15:20:31"
+}
+```
+
+**脑区划分**（13 个）：感知输入层 4 个（全球交易流、监管制裁清单、商户主数据、全球法规更新）；
+脑区计算层 6 个（联合风控决策核、合规判断核、密文计算核、隐私预算调度核、数据血缘记忆核、联盟链存证核）；
+决策输出层 3 个（风险评分与标签、拦截与告警指令、监管合规报告）。
+`load`（0~1）由真实指标折算，前端据此调整节点尺寸与颜色，`flows.value` 决定脉冲强度。
+
+---
+
 ## 4. 隐私计算引擎 `/api/engine`
 
 ### 4.1 任务管理

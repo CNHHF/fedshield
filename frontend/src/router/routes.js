@@ -19,19 +19,25 @@ export const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/home',
+    redirect: '/brain',
     children: [
+      {
+        path: 'brain',
+        name: 'Brain',
+        component: () => import('@/views/brain/index.vue'),
+        meta: { title: 'AI 风控大脑', icon: 'Cpu', group: '智能大脑' }
+      },
       {
         path: 'home',
         name: 'Home',
         component: () => import('@/views/home/index.vue'),
-        meta: { title: '平台首页', icon: 'HomeFilled', group: '门户' }
+        meta: { title: '平台首页', icon: 'HomeFilled', group: '智能大脑' }
       },
       {
         path: 'console',
         name: 'Console',
         component: () => import('@/views/console/index.vue'),
-        meta: { title: '数据概览控制台', icon: 'Odometer', group: '门户' }
+        meta: { title: '数据概览控制台', icon: 'Odometer', group: '智能大脑' }
       }
     ]
   },

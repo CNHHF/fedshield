@@ -3,15 +3,19 @@
     <!-- 英雄区 -->
     <section class="fs-home__hero">
       <div class="fs-home__hero-inner">
-        <el-tag effect="dark" class="fs-home__badge">跨境电商 · 外贸 B2B · 全球收单</el-tag>
-        <h1>跨境敏感数据合规流通解决方案</h1>
+        <el-tag effect="dark" class="fs-home__badge">面向全球支付场景 · AI 驱动风控合规智能大脑框架</el-tag>
+        <h1>AI 风控合规智能大脑</h1>
         <p>
-          FedShield 以联邦学习、同态加密、差分隐私为核心，结合联盟链存证与全球合规规则引擎，
-          实现「原始数据不出域、可用不可见、合规可追溯」，支撑联合风控、黑名单匿踪查询与全球交易联合统计。
+          以「感知输入 → 脑区计算 → 决策输出」的脑机结构，统一调度联邦学习、同态加密、差分隐私、
+          合规规则引擎与联盟链存证，实现「原始数据不出域、可用不可见、合规可追溯」，
+          支撑联合风控、黑名单匿踪查询与全球交易联合统计。
         </p>
         <div class="fs-home__actions">
-          <el-button type="primary" size="large" @click="go('/console')">
-            <el-icon><Odometer /></el-icon>进入数据概览控制台
+          <el-button type="primary" size="large" @click="go('/brain')">
+            <el-icon><Cpu /></el-icon>进入大脑数据流展板
+          </el-button>
+          <el-button size="large" plain @click="go('/console')">
+            <el-icon><Odometer /></el-icon>数据概览控制台
           </el-button>
           <el-button size="large" plain @click="go('/engine/query')">
             <el-icon><Search /></el-icon>体验黑名单匿踪查询
@@ -27,6 +31,33 @@
     </section>
 
     <div class="fs-home__body">
+      <!-- 大脑结构 -->
+      <section class="fs-card">
+        <div class="fs-card__header">
+          <span class="fs-card__title">智能大脑结构</span>
+          <el-button text type="primary" @click="go('/brain')">查看实时数据流 →</el-button>
+        </div>
+        <div class="fs-card__body">
+          <p class="fs-home__paragraph">
+            平台把六大功能模块映射为脑区：<strong>感知输入层</strong>汇聚全球交易流、监管制裁清单、商户主数据与法规更新；
+            <strong>脑区计算层</strong>由联合风控决策核、合规判断核、密文计算核、隐私预算调度核、数据血缘记忆核与联盟链存证核
+            协同完成决策，全程数据以密文形态流转；<strong>决策输出层</strong>下发风险评分、拦截告警与监管合规报告。
+            脑区负载与数据脉冲均由真实业务指标驱动，可在展板上实时观察。
+          </p>
+          <div class="fs-home__brain">
+            <div v-for="layer in brainLayers" :key="layer.name" class="fs-home__brain-layer">
+              <div class="fs-home__brain-head" :style="{ color: layer.color }">
+                <el-icon :size="18"><component :is="layer.icon" /></el-icon>
+                <strong>{{ layer.name }}</strong>
+              </div>
+              <ul>
+                <li v-for="node in layer.nodes" :key="node">{{ node }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 关于平台 -->
       <section class="fs-card">
         <div class="fs-card__header">
@@ -145,10 +176,32 @@ function go(path) {
 }
 
 const heroStats = [
+  { value: '13 脑区', label: '感知 / 计算 / 决策三层结构' },
   { value: '180+', label: '覆盖国家/地区法规库' },
   { value: '≤300ms', label: '黑名单匿踪查询响应' },
-  { value: 'AUC 0.85+', label: '联邦联合风控模型' },
   { value: '0 条', label: '原始数据出境记录' }
+]
+
+// 智能大脑三层结构（与后端 /api/brain/overview 的脑区图谱一致）
+const brainLayers = [
+  {
+    name: '感知输入层',
+    icon: 'Aim',
+    color: '#1f5fd8',
+    nodes: ['全球交易流', '监管制裁清单', '商户主数据', '全球法规更新']
+  },
+  {
+    name: '脑区计算层',
+    icon: 'Cpu',
+    color: '#8b5cf6',
+    nodes: ['联合风控决策核', '合规判断核', '密文计算核', '隐私预算调度核', '数据血缘记忆核', '联盟链存证核']
+  },
+  {
+    name: '决策输出层',
+    icon: 'Promotion',
+    color: '#14a37f',
+    nodes: ['风险评分与标签', '拦截与告警指令', '监管合规报告']
+  }
 ]
 
 const architecture = [
@@ -300,6 +353,36 @@ void userStore
   color: var(--fs-text-secondary);
   font-size: 12px;
   line-height: 1.6;
+}
+.fs-home__brain {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.fs-home__brain-layer {
+  padding: 16px;
+  border: 1px solid var(--fs-border);
+  border-radius: 8px;
+  background: #fafbfd;
+}
+.fs-home__brain-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.fs-home__brain-layer ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--fs-text-secondary);
+  font-size: 12px;
+  line-height: 2;
+}
+@media (max-width: 1024px) {
+  .fs-home__brain {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .fs-home__value {
   padding: 18px;

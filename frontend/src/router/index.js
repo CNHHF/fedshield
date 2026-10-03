@@ -15,7 +15,7 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta?.public) {
     if (to.path === '/login' && userStore.isLoggedIn) {
-      next('/console')
+      next('/brain')
       return
     }
     next()
@@ -28,7 +28,8 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta?.permission && !userStore.hasPermission(to.meta.permission)) {
-    next('/console')
+    // 权限不足时回到智能大脑展板（所有角色均可访问）
+    next('/brain')
     return
   }
   next()

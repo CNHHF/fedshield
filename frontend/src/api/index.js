@@ -31,6 +31,13 @@ export const dashboardApi = {
   performance: () => request.get('/dashboard/performance')
 }
 
+/* ---------------- AI 风控合规智能大脑 ---------------- */
+export const brainApi = {
+  // 脑区图谱 + 数据流 + 关键指标 + 实时脉冲（silent 用于后台定时刷新，不弹提示）
+  overview: (options = {}) => request.get('/brain/overview', options),
+  atlas: (options = {}) => request.get('/brain/atlas', options)
+}
+
 /* ---------------- 隐私计算引擎 ---------------- */
 export const engineApi = {
   createTask: (data) => request.post('/engine/tasks', data),
