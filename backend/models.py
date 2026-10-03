@@ -840,6 +840,242 @@ class CircuitBreakerEvent(db.Model):
     status = db.Column(db.String(16), default="locked")  # locked / released / appealed
 
 
+# ---------------------------------------------------------------------------
+# 支付智能处理（赛题建设范围一）
+# ---------------------------------------------------------------------------
+
+
+class PaymentChannel(TimestampMixin, db.Model):
+    """支付通道：智能路由的候选池。"""
+
+    __tablename__ = "fs_payment_channel"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False)
+    name = db.Column(db.String(64), nullable=False)
+    region = db.Column(db.String(16), default="GLOBAL")
+    currencies = db.Column(db.JSON, default=list)     # 支持币种
+    destinations = db.Column(db.JSON, default=list)   # 支持目的地
+    feeRate = db.Column(db.Float, default=0.006)      # 费率
+    successRate = db.Column(db.Float, default=0.97)   # 历史成功率
+    avgLatencyMs = db.Column(db.Integer, default=1800)
+    singleLimit = db.Column(db.Float, default=5_000_000)  # 单笔限额（元）
+    status = db.Column(db.String(16), default="available")  # available / degraded / down
+    complianceNote = db.Column(db.String(255), default="")
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code,
+            "name": self.name,
+            "region": self.region,
+            "currencies": self.currencies or [],
+            "destinations": self.destinations or [],
+            "feeRate": self.feeRate,
+            "successRate": self.successRate,
+            "avgLatencyMs": self.avgLatencyMs,
+            "singleLimit": self.singleLimit,
+            "status": self.status,
+            "complianceNote": self.complianceNote,
+        }
+
+
+class PaymentOrder(TimestampMixin, db.Model):
+    """支付订单：记录「接入 → 风控 → 路由 → 处理 → 重试 → 补偿」全链路状态。"""
+
+    __tablename__ = "fs_payment_order"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    merchantCode = db.Column(db.String(32), default="", index=True)
+    merchantName = db.Column(db.String(128), default="")
+    region = db.Column(db.String(16), default="CN")
+    destRegion = db.Column(db.String(16), default="EU")
+    amount = db.Column(db.Float, default=0.0)
+    currency = db.Column(db.String(8), default="CNY")
+    channel = db.Column(db.String(32), default="")
+    channelName = db.Column(db.String(64), default="")
+    status = db.Column(db.String(16), default="received", index=True)
+    # received/risk_checked/routed/processing/success/failed/retrying/compensated/blocked/manual
+    riskScore = db.Column(db.Float, default=0.0)
+    riskLevel = db.Column(db.String(16), default="low")
+    routeScore = db.Column(db.Float, default=0.0)
+    attempts = db.Column(db.Integer, default=0)
+    failureReason = db.Column(db.String(128), default="")
+    compensated = db.Column(db.Boolean, default=False)
+    events = db.Column(db.JSON, default=list)   # 全链路事件（时间戳 + 阶段 + 详情）
+    durationMs = db.Column(db.Integer, default=0)
+    finishedAt = db.Column(db.DateTime)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "merchantCode": self.merchantCode,
+            "merchantName": self.merchantName,
+            "region": self.region,
+            "destRegion": self.destRegion,
+            "amount": round(self.amount or 0, 2),
+            "currency": self.currency,
+            "channel": self.channel,
+            "channelName": self.channelName,
+            "status": self.status,
+            "riskScore": round(self.riskScore or 0, 4),
+            "riskLevel": self.riskLevel,
+            "routeScore": round(self.routeScore or 0, 4),
+            "attempts": self.attempts,
+            "failureReason": self.failureReason,
+            "compensated": self.compensated,
+            "events": self.events or [],
+            "durationMs": self.durationMs,
+            "createdAt": iso(self.createdAt),
+            "finishedAt": iso(self.finishedAt),
+        }
+
+
+# ---------------------------------------------------------------------------
+# AI 审核一致性管理（赛题建设范围四）
+# ---------------------------------------------------------------------------
+
+
+class ReviewRecord(TimestampMixin, db.Model):
+    """审核记录：AI 初审结论 + 人工复核结论 + 差异标记（一致性评估的数据基础）。"""
+
+    __tablename__ = "fs_review_record"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    batchCode = db.Column(db.String(32), default="", index=True)
+    targetType = db.Column(db.String(16), default="payment")   # payment / merchant / kyc
+    targetId = db.Column(db.String(32), default="")
+    targetName = db.Column(db.String(128), default="")
+    amount = db.Column(db.Float, default=0.0)
+    riskLevel = db.Column(db.String(16), default="low")
+    # 审核时的原始特征向量：用于策略优化后的「同批复盘」（差异回流必须可复现）
+    features = db.Column(db.JSON, default=dict)
+    # ---------------- AI 初审 ----------------
+    aiDecision = db.Column(db.String(16), default="")          # approve / reject / manual
+    aiConfidence = db.Column(db.Float, default=0.0)
+    aiScore = db.Column(db.Float, default=0.0)
+    aiReasons = db.Column(db.JSON, default=list)
+    aiLatencyMs = db.Column(db.Integer, default=0)
+    # ---------------- 人工复核 ----------------
+    humanDecision = db.Column(db.String(16), default="")       # approve / reject / manual
+    humanReviewer = db.Column(db.String(64), default="")
+    humanComment = db.Column(db.String(255), default="")
+    humanLatencyMs = db.Column(db.Integer, default=0)
+    reviewedAt = db.Column(db.DateTime)
+    # ---------------- 一致性 ----------------
+    agreed = db.Column(db.Boolean, default=True, index=True)
+    diffType = db.Column(db.String(32), default="")            # none/false_negative/false_positive/both_manual
+    diffSeverity = db.Column(db.String(16), default="")        # high / medium / low
+    fedBack = db.Column(db.Boolean, default=False)             # 差异是否已回流至策略优化
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "batchCode": self.batchCode,
+            "targetType": self.targetType,
+            "targetId": self.targetId,
+            "targetName": self.targetName,
+            "amount": round(self.amount or 0, 2),
+            "riskLevel": self.riskLevel,
+            "features": self.features or {},
+            "aiDecision": self.aiDecision,
+            "aiConfidence": round(self.aiConfidence or 0, 4),
+            "aiScore": round(self.aiScore or 0, 4),
+            "aiReasons": self.aiReasons or [],
+            "aiLatencyMs": self.aiLatencyMs,
+            "humanDecision": self.humanDecision,
+            "humanReviewer": self.humanReviewer,
+            "humanComment": self.humanComment,
+            "humanLatencyMs": self.humanLatencyMs,
+            "reviewedAt": iso(self.reviewedAt),
+            "agreed": self.agreed,
+            "diffType": self.diffType,
+            "diffSeverity": self.diffSeverity,
+            "fedBack": self.fedBack,
+            "createdAt": iso(self.createdAt),
+        }
+
+
+class OptimizationRecord(db.Model):
+    """策略优化记录：差异回流后的阈值/权重调整及其效果对比（持续优化闭环）。"""
+
+    __tablename__ = "fs_optimization"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False)
+    batchCode = db.Column(db.String(32), default="")
+    suggestion = db.Column(db.String(512), default="")
+    beforeConfig = db.Column(db.JSON, default=dict)
+    afterConfig = db.Column(db.JSON, default=dict)
+    beforeMetrics = db.Column(db.JSON, default=dict)
+    afterMetrics = db.Column(db.JSON, default=dict)
+    applied = db.Column(db.Boolean, default=False)
+    appliedBy = db.Column(db.String(64), default="")
+    createdAt = db.Column(db.DateTime, default=now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "batchCode": self.batchCode,
+            "suggestion": self.suggestion,
+            "beforeConfig": self.beforeConfig or {},
+            "afterConfig": self.afterConfig or {},
+            "beforeMetrics": self.beforeMetrics or {},
+            "afterMetrics": self.afterMetrics or {},
+            "applied": self.applied,
+            "appliedBy": self.appliedBy,
+            "createdAt": iso(self.createdAt),
+        }
+
+
+class MonitoringAlert(TimestampMixin, db.Model):
+    """异常监测预警（智能风控：异常行为检测 → 实时预警 → 自动处置闭环）。"""
+
+    __tablename__ = "fs_monitoring_alert"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False)
+    ruleCode = db.Column(db.String(32), default="")
+    ruleName = db.Column(db.String(64), default="")
+    targetType = db.Column(db.String(16), default="payment")
+    targetId = db.Column(db.String(32), default="")
+    targetName = db.Column(db.String(128), default="")
+    amount = db.Column(db.Float, default=0.0)
+    riskLevel = db.Column(db.String(16), default="medium", index=True)
+    riskScore = db.Column(db.Float, default=0.0)
+    evidence = db.Column(db.JSON, default=list)
+    action = db.Column(db.String(32), default="")        # pass / verify / block / manual
+    actionLabel = db.Column(db.String(32), default="")
+    status = db.Column(db.String(16), default="handled", index=True)
+    handledAt = db.Column(db.DateTime)
+    detail = db.Column(db.String(255), default="")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "code": self.code,
+            "ruleCode": self.ruleCode,
+            "ruleName": self.ruleName,
+            "targetType": self.targetType,
+            "targetId": self.targetId,
+            "targetName": self.targetName,
+            "amount": round(self.amount or 0, 2),
+            "riskLevel": self.riskLevel,
+            "riskScore": round(self.riskScore or 0, 4),
+            "evidence": self.evidence or [],
+            "action": self.action,
+            "actionLabel": self.actionLabel,
+            "status": self.status,
+            "handledAt": iso(self.handledAt),
+            "detail": self.detail,
+            "createdAt": iso(self.createdAt),
+        }
+
+
 def next_code(prefix: str, sequence: int) -> str:
     """生成业务单据编码，例如 TASK-20260518-0007 / RPT-20260518-0003。"""
     return f"{prefix}-{now().strftime('%Y%m%d')}-{sequence:04d}"
@@ -851,6 +1087,8 @@ __all__ = [
     "DataGrant", "BudgetItem", "BudgetApplication", "BudgetAdjustment", "BudgetTrend",
     "SanctionEntry", "Merchant", "Transaction", "LineageNode", "LineageLink", "AuditLog",
     "ChainBlock", "LineageRecord", "CircuitBreakerEvent", "now", "iso", "next_code",
+    # 支付智能处理 / AI 审核一致性 / 异常监测（赛题建设范围一、二、四）
+    "PaymentChannel", "PaymentOrder", "ReviewRecord", "OptimizationRecord", "MonitoringAlert",
 ]
 
 # ---------------------------------------------------------------------------

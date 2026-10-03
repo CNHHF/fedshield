@@ -1,4 +1,4 @@
-# FedShield 平台 API 契约（v1.0）
+# FedShield 平台 API 契约（v1.1）
 
 > 后端基址：`http://127.0.0.1:5000`，所有业务接口统一前缀 `/api`。
 > 前端开发服务器（Vite，5173）通过 `vite.config.js` 的 proxy 转发 `/api` 到 5000 端口。
@@ -146,6 +146,77 @@ JWT 载荷：`{ sub: username, role: <role>, org: <org>, exp, iat, jti }`；角�
 脑区计算层 6 个（联合风控决策核、合规判断核、密文计算核、隐私预算调度核、数据血缘记忆核、联盟链存证核）；
 决策输出层 3 个（风险评分与标签、拦截与告警指令、监管合规报告）。
 `load`（0~1）由真实指标折算，前端据此调整节点尺寸与颜色，`flows.value` 决定脉冲强度。
+
+---
+
+## 3.6 全球支付一体化智能支撑 `/api/ops`
+
+对应赛题 A16 五大建设范围，是「AI 驱动风控合规智能大脑」的核心业务接口。
+
+### ① 支付智能处理能力 `/api/ops/payment`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/ops/payment/channels` | 通道池（费率/成功率/时延/限额/健康状态）、受限目的地、重试策略、路由权重 |
+| POST | `/api/ops/payment/route-preview` | 智能路由预演：`{amount,currency,destRegion,riskLevel}` → 候选通道打分与排除原因 |
+| POST | `/api/ops/payment/process` | 批量处理：`{count:1~50, injectFailureRate:0~0.6}` → 全链路订单与链路指标 |
+| GET | `/api/ops/payment/orders` | 订单列表，支持 `status/channel/riskLevel/keyword/page/size` |
+| GET | `/api/ops/payment/orders/<code>` | 订单详情（含 `events` 全链路事件：接入→风控→路由→处理→重试→补偿） |
+| GET | `/api/ops/payment/summary` | 链路指标：成功率、直通率、重试率、补偿率、风控拦截率、平均/P95 耗时、通道路由分布 |
+
+订单状态机：`received → risk_checked → routed → processing → success / failed → retrying → compensated`，
+风控前置命中时进入 `blocked`（自动拦截）或 `manual`（转人工）。
+`injectFailureRate` 为**通道故障演练**开关，用于演示失败重试与自动补偿能力。
+
+### ② 智能风控与异常监测 `/api/ops/monitoring`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/ops/monitoring/rules` | 异常检测规则（6 条）与统一处置口径（放行/二次验证/转人工/拦截） |
+| POST | `/api/ops/monitoring/detect` | `{limit:20~2000}` 执行异常检测 → `{summary, alerts, scanned}` |
+| GET | `/api/ops/monitoring/alerts` | 实时预警列表，支持 `riskLevel/action/status/page/size` |
+| POST | `/api/ops/monitoring/alerts/<id>/handle` | 人工确认处置结果（自动处置 + 人工确认闭环） |
+| GET | `/api/ops/monitoring/summary` | 预警汇总、处置分布、自动化处置率、账户/商户风险 Top10 |
+
+检测规则：短时高频（按「商户 × 小时」窗口）、金额突增、高风险地区/高风险交易、
+夜间集中交易、收款人分散度异常、新商户大额；同一商户命中多条规则时叠加**组合风险加成**。
+
+### ③④ 智能合规审核与 AI 审核一致性管理 `/api/ops/review`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/ops/review/batch` | 执行审核批次：AI 初审 → 人工复核 → 差异标记，`{count:4~60}` |
+| GET | `/api/ops/review/records` | 审核记录，支持 `batchCode/agreed/diffType/riskLevel/page/size` |
+| GET | `/api/ops/review/batches` | 批次列表 |
+| GET | `/api/ops/review/consistency` | **一致性评估**（见下） |
+| GET | `/api/ops/review/policy` | 当前审核策略与统一标准（结论口径 + 风险标签体系） |
+| POST | `/api/ops/review/optimize` | **差异回流**：网格搜索最优策略并给出优化前后对比 |
+| POST | `/api/ops/review/apply` | 应用优化策略（形成持续优化闭环） |
+| GET | `/api/ops/review/optimizations` | 策略优化记录（证据链） |
+
+一致性评估口径（关键）：
+
+| 指标 | 含义 |
+| --- | --- |
+| `agreementRate` | **核心一致性**：仅统计 AI 自主决策（approve/reject）样本中与人工结论一致的比例 |
+| `overallAlignmentRate` | 总体协同率：转人工样本计入「已协同处理」，不视为分歧 |
+| `automationRate` / `manualTransferRate` | AI 可独立决策比例 / 转人工比例（低置信度强制转人工） |
+| `kappa` / `kappaLevel` | Cohen's Kappa（排除随机一致后的真实一致性水平） |
+| `confusionMatrix` | AI 结论 × 人工结论 三分类混淆矩阵 |
+| `falseNegativeCount` / `falsePositiveCount` | 漏放（AI 通过但人工拒绝）/ 误拦（AI 拒绝但人工通过） |
+| `byRiskLevel` / `byConfidence` | 按风险等级、按置信度区间的一致性 |
+| `efficiency` | AI 初审与人工复核的平均耗时与提速倍数 |
+
+策略寻优采用**候选阈值网格复盘**：对每组候选策略用同一批真实样本复盘，
+硬约束为「漏放率不得上升 且 一致性不得低于当前的 98%」，
+综合得分 `= 0.6×一致性 + 0.25×自动化率 − 1.0×漏放率`；若无更优解则明确返回"维持现状"。
+
+### ⑤ 运营决策支撑 `/api/ops`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/ops/decisions` | 决策建议（优先级/依据/动作/责任角色/预期收益）+ 三组指标 |
+| GET | `/api/ops/overview` | 五大能力总览（支付 / 一致性 / 监测 / 建议条数） |
 
 ---
 

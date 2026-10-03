@@ -38,6 +38,38 @@ export const brainApi = {
   atlas: (options = {}) => request.get('/brain/atlas', options)
 }
 
+/* ---------------- 全球支付一体化智能支撑（赛题五大建设范围） ---------------- */
+export const opsApi = {
+  // ① 支付智能处理：交易接入 / 智能路由 / 通道选择 / 状态跟踪 / 失败重试 / 自动补偿
+  paymentChannels: () => request.get('/ops/payment/channels'),
+  paymentRoutePreview: (data) => request.post('/ops/payment/route-preview', data),
+  paymentProcess: (data) => request.post('/ops/payment/process', data),
+  paymentOrders: (params) => request.get('/ops/payment/orders', { params }),
+  paymentOrderDetail: (code) => request.get(`/ops/payment/orders/${code}`),
+  paymentSummary: () => request.get('/ops/payment/summary'),
+
+  // ② 智能风控：异常行为检测 / 实时预警 / 自动处置闭环
+  monitoringRules: () => request.get('/ops/monitoring/rules'),
+  monitoringDetect: (data) => request.post('/ops/monitoring/detect', data),
+  monitoringAlerts: (params) => request.get('/ops/monitoring/alerts', { params }),
+  monitoringHandle: (id, data) => request.post(`/ops/monitoring/alerts/${id}/handle`, data),
+  monitoringSummary: () => request.get('/ops/monitoring/summary'),
+
+  // ③④ 智能审核协同与 AI 审核一致性管理
+  reviewBatch: (data) => request.post('/ops/review/batch', data),
+  reviewRecords: (params) => request.get('/ops/review/records', { params }),
+  reviewBatches: () => request.get('/ops/review/batches'),
+  reviewConsistency: (params) => request.get('/ops/review/consistency', { params }),
+  reviewPolicy: () => request.get('/ops/review/policy'),
+  reviewOptimize: (data) => request.post('/ops/review/optimize', data),
+  reviewApply: (data) => request.post('/ops/review/apply', data),
+  reviewOptimizations: () => request.get('/ops/review/optimizations'),
+
+  // ⑤ 运营决策支撑
+  decisions: (params) => request.get('/ops/decisions', { params }),
+  overview: () => request.get('/ops/overview')
+}
+
 /* ---------------- 隐私计算引擎 ---------------- */
 export const engineApi = {
   createTask: (data) => request.post('/engine/tasks', data),

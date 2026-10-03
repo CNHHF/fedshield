@@ -293,6 +293,37 @@ def seed_all() -> dict:
                 )
             )
 
+    # ---------------- 植入异常样本（供智能风控与异常监测演示） ----------------
+    # 说明：以下为**刻意构造的可疑交易模式**，用于验证「异常行为检测 + 自动处置」能力，
+    # 涵盖赛题关注的拆分交易、金额突增、高风险地区、收款人分散、新商户大额等特征。
+    anomaly_merchants = RANDOM.sample(merchants, 4)
+    anomaly_plan = [
+        # (商户, 场景说明, 单笔金额区间, 笔数, 小时, 目的地, 付款方数)
+        (anomaly_merchants[0], "拆分交易：1 小时内 8 笔小额高频", (18_000, 45_000), 8, 3, "ME", 2),
+        (anomaly_merchants[1], "金额突增：单笔显著高于历史均值", (1_600_000, 2_800_000), 3, 14, "AF", 1),
+        (anomaly_merchants[2], "收款人分散：单日对公付款方激增", (320_000, 680_000), 7, 11, "SEA", 9),
+        (anomaly_merchants[3], "高风险地区集中交易", (240_000, 520_000), 5, 23, "AF", 3),
+    ]
+    anomaly_day = now() - timedelta(days=2)
+    for merchant, _scene, amount_range, count, hour, dest, counterparties in anomaly_plan:
+        for index in range(count):
+            tx_index += 1
+            db.session.add(
+                Transaction(
+                    code=f"TX{tx_index:07d}",
+                    merchantCode=merchant.code,
+                    region=merchant.region,
+                    destRegion=dest,
+                    amount=round(RANDOM.uniform(*amount_range), 2),
+                    currency="USD",
+                    category=merchant.category,
+                    counterparties=counterparties,
+                    level="P1",
+                    riskLevel="high",
+                    occurredAt=anomaly_day.replace(hour=hour, minute=RANDOM.randint(0, 59)),
+                )
+            )
+
     # ---------------- 合规规则（文档中的 3 条默认规则） ----------------
     for item in rule_engine.default_rules():
         db.session.add(

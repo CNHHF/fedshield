@@ -42,6 +42,51 @@ export const routes = [
     ]
   },
   {
+    path: '/ops',
+    component: Layout,
+    redirect: '/ops/payment',
+    children: [
+      {
+        path: 'payment',
+        name: 'OpsPayment',
+        component: () => import('@/views/ops/PaymentFlow.vue'),
+        // 查看权限对所有角色开放（监管端需核查支付效能）；批量处理等写操作由后端校验 engine:task:manage
+        meta: { title: '支付智能处理', icon: 'CreditCard', group: '一体化智能支撑' }
+      },
+      {
+        path: 'channels',
+        name: 'OpsChannels',
+        component: () => import('@/views/ops/PaymentChannels.vue'),
+        meta: { title: '通道与智能路由', icon: 'Guide', group: '一体化智能支撑' }
+      },
+      {
+        path: 'monitoring',
+        name: 'OpsMonitoring',
+        component: () => import('@/views/ops/Monitoring.vue'),
+        meta: { title: '风控与异常监测', icon: 'Warning', group: '一体化智能支撑' }
+      },
+      {
+        path: 'review',
+        name: 'OpsReview',
+        component: () => import('@/views/ops/ReviewConsistency.vue'),
+        // 一致性指标对监管端开放查看；执行审核批次/策略寻优等写操作由后端校验 engine:task:manage
+        meta: { title: 'AI 审核一致性', icon: 'DocumentChecked', group: '一体化智能支撑' }
+      },
+      {
+        path: 'standard',
+        name: 'OpsStandard',
+        component: () => import('@/views/ops/AuditStandard.vue'),
+        meta: { title: '统一审核标准', icon: 'Stamp', group: '一体化智能支撑' }
+      },
+      {
+        path: 'decision',
+        name: 'OpsDecision',
+        component: () => import('@/views/ops/Decision.vue'),
+        meta: { title: '运营决策支撑', icon: 'TrendCharts', group: '一体化智能支撑' }
+      }
+    ]
+  },
+  {
     path: '/engine',
     component: Layout,
     redirect: '/engine/tasks',

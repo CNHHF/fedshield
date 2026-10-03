@@ -40,10 +40,42 @@ def create_app(config_name: str | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_schema(app)
         _warm_up_caches(app)
 
     app.logger.info("FedShield 后端已就绪：%s", app.config["SQLALCHEMY_DATABASE_URI"])
     return app
+
+
+def _ensure_schema(app: Flask) -> None:
+    """轻量结构兼容：为已存在的库补齐「新增的可空字段」。
+
+    演示项目不引入 Alembic，但迭代中会新增字段（例如异常预警的 amount）。
+    这里在启动时对比模型与库结构，缺列则自动 ALTER TABLE ADD COLUMN，
+    让老库无需删除重建即可继续使用（仅处理新增可空列，不做改类型/删列）。
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        engine = db.engine
+        inspector = inspect(engine)
+        existing = set(inspector.get_table_names())
+        added: list[str] = []
+        for table in db.metadata.sorted_tables:
+            if table.name not in existing:
+                continue
+            current = {column["name"] for column in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in current:
+                    continue
+                column_type = column.type.compile(engine.dialect)
+                with engine.begin() as conn:
+                    conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}'))
+                added.append(f"{table.name}.{column.name} ({column_type})")
+        if added:
+            app.logger.info("已自动补齐 %d 个新增字段：%s", len(added), "、".join(added))
+    except Exception as exc:  # 结构兼容失败不应阻断启动
+        app.logger.warning("结构兼容检查失败（不影响启动，如异常请删除 instance/*.db 重建）：%s", exc)
 
 
 def _warm_up_caches(app: Flask) -> None:

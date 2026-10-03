@@ -33,6 +33,10 @@ from ..models import (
     Dataset,
     LineageLink,
     LineageNode,
+    MonitoringAlert,
+    OptimizationRecord,
+    PaymentOrder,
+    ReviewRecord,
     SanctionEntry,
     Transaction,
     now,
@@ -58,17 +62,26 @@ BRAIN_ATLAS = [
      "desc": "全球数据隐私法规库，新规发布后转化为自动化规则"},
 
     # ---------------- 脑区（中央核团） ----------------
-    {"id": "core_risk", "name": "联合风控决策核", "group": "cortex", "x": 372, "y": 158,
-     "desc": "横向联邦学习联合建模，输出风险评分与标签"},
-    {"id": "core_compliance", "name": "合规判断核", "group": "cortex", "x": 628, "y": 158,
-     "desc": "规则引擎自动校验跨境传输、授权与脱敏合规性"},
-    {"id": "core_crypto", "name": "密文计算核", "group": "cortex", "x": 500, "y": 300,
+    # 布局：左半球功能列（x=360）/ 右半球功能列（x=640）/ 中央纵裂核团（x=500）
+    {"id": "core_risk", "name": "联合风控决策核", "group": "cortex", "x": 360, "y": 108,
+     "desc": "横向联邦学习联合建模，输出风险评分与标签（赛题：智能风控能力）"},
+    {"id": "core_compliance", "name": "合规判断核", "group": "cortex", "x": 640, "y": 108,
+     "desc": "规则引擎自动校验跨境传输、授权与脱敏合规性（赛题：智能合规审核能力）"},
+    {"id": "core_crypto", "name": "密文计算核", "group": "cortex", "x": 500, "y": 150,
      "desc": "Paillier 同态加密 / RSA 盲签名 / SM4 国密，数据可用不可见"},
-    {"id": "core_budget", "name": "隐私预算调度核", "group": "cortex", "x": 372, "y": 442,
-     "desc": "按场景动态分配 ε，超阈值预警，防止原始数据被反推"},
-    {"id": "core_lineage", "name": "数据血缘记忆核", "group": "cortex", "x": 628, "y": 442,
+    {"id": "core_payment", "name": "支付处理核", "group": "cortex", "x": 360, "y": 214,
+     "desc": "交易接入、智能路由、通道选择、失败重试与自动补偿（赛题：支付智能处理能力）"},
+    {"id": "core_monitor", "name": "异常监测核", "group": "cortex", "x": 640, "y": 214,
+     "desc": "异常行为检测、实时预警与自动处置闭环（赛题：智能风控能力）"},
+    {"id": "core_review", "name": "审核一致性核", "group": "cortex", "x": 360, "y": 320,
+     "desc": "AI 初审 → 人工复核 → 差异回流 → 持续优化，含一致性评估机制（赛题：AI 审核一致性管理）"},
+    {"id": "core_lineage", "name": "数据血缘记忆核", "group": "cortex", "x": 640, "y": 320,
      "desc": "全链路流转图谱与溯源审计，支撑监管调证"},
-    {"id": "core_chain", "name": "联盟链存证核", "group": "cortex", "x": 500, "y": 556,
+    {"id": "core_budget", "name": "隐私预算调度核", "group": "cortex", "x": 360, "y": 426,
+     "desc": "按场景动态分配 ε，超阈值预警，防止原始数据被反推"},
+    {"id": "core_decision", "name": "运营决策核", "group": "cortex", "x": 640, "y": 426,
+     "desc": "指标监控、策略评估、趋势研判与决策建议输出（赛题：运营决策支撑能力）"},
+    {"id": "core_chain", "name": "联盟链存证核", "group": "cortex", "x": 500, "y": 468,
      "desc": "Hyperledger Fabric 语义的哈希存证，操作不可篡改"},
 
     # ---------------- 决策输出层（右） ----------------
@@ -100,12 +113,26 @@ BRAIN_FLOWS = [
     {"source": "core_risk", "target": "core_lineage", "label": "特征血缘"},
     {"source": "core_crypto", "target": "core_chain", "label": "参数摘要"},
 
+    # 赛题五大能力之间的协同（支付 / 风控 / 合规审核 / 一致性 / 运营决策）
+    {"source": "core_payment", "target": "core_risk", "label": "交易风控前置"},
+    {"source": "core_monitor", "target": "core_risk", "label": "异常特征回流"},
+    {"source": "core_review", "target": "core_compliance", "label": "审核口径同步"},
+    {"source": "core_monitor", "target": "core_review", "label": "高风险样本送审"},
+    {"source": "core_review", "target": "core_decision", "label": "一致性与自动化率"},
+    {"source": "core_payment", "target": "core_decision", "label": "支付效能指标"},
+    {"source": "core_monitor", "target": "core_decision", "label": "风险预警指标"},
+    {"source": "core_decision", "target": "core_payment", "label": "路由策略调优"},
+    {"source": "core_decision", "target": "core_review", "label": "审核阈值调优"},
+    {"source": "core_review", "target": "core_chain", "label": "审核留痕"},
+
     # 脑区 → 决策输出
     {"source": "core_risk", "target": "out_score", "label": "评分下发"},
     {"source": "core_compliance", "target": "out_action", "label": "阻断/放行"},
     {"source": "core_chain", "target": "out_report", "label": "存证编号"},
     {"source": "core_lineage", "target": "out_report", "label": "溯源证据"},
     {"source": "core_budget", "target": "out_action", "label": "额度熔断"},
+    {"source": "core_monitor", "target": "out_action", "label": "实时预警处置"},
+    {"source": "core_payment", "target": "out_score", "label": "支付结果回写"},
 ]
 
 GROUP_LABELS = {
@@ -131,6 +158,31 @@ def _ratio(value: float, total: float, default: float = 0.2) -> float:
     if not total:
         return default
     return round(max(0.05, min(1.0, value / total)), 4)
+
+
+def _decision_count() -> int:
+    """运营决策建议条数（与 /api/ops/decisions 口径一致，避免重复计算）。"""
+    from ..engine import review as review_engine
+
+    records = [
+        {
+            **item.to_dict(),
+            "raw": item.features or {},
+        }
+        for item in ReviewRecord.query.all()
+    ]
+    orders = [item.to_dict() for item in PaymentOrder.query.all()]
+    alerts = [item.to_dict() for item in MonitoringAlert.query.all()]
+    consistency = review_engine.evaluate_consistency(records) if records else {}
+    from ..engine import monitoring as monitoring_engine
+
+    return len(
+        review_engine.decision_advice(
+            consistency,
+            monitoring_engine.summarize_alerts(alerts) if alerts else {},
+            alerts,
+        )
+    )
 
 
 def collect_brain_metrics() -> dict:
@@ -170,6 +222,20 @@ def collect_brain_metrics() -> dict:
     report_total = _count(ComplianceReport)
     grant_active = len([g for g in DataGrant.query.all() if g.computed_status == "active"])
     node_online = _count(CollaborationNode, CollaborationNode.status == "online")
+
+    # ---------------- 赛题五大能力（支付 / 风控 / 合规审核 / 一致性 / 运营决策） ----------------
+    payment_orders = PaymentOrder.query.all()
+    payment_ok = len([item for item in payment_orders if item.status in ("success", "retrying")])
+    payment_processed = len([item for item in payment_orders if item.status in ("success", "retrying", "failed", "compensated")])
+    payment_compensated = len([item for item in payment_orders if item.compensated])
+
+    review_records = ReviewRecord.query.all()
+    review_auto = [item for item in review_records if item.aiDecision in ("approve", "reject")]
+    review_agreed = len([item for item in review_auto if item.agreed])
+
+    monitor_alerts = MonitoringAlert.query.all()
+    monitor_high = len([item for item in monitor_alerts if item.riskLevel == "high"])
+    monitor_auto = len([item for item in monitor_alerts if item.action in ("pass", "block")])
 
     return {
         "src_tx": {
@@ -245,6 +311,42 @@ def collect_brain_metrics() -> dict:
                 {"label": "区块高度", "value": chain_blocks, "unit": ""},
                 {"label": "存证日志", "value": audit_total, "unit": "条"},
                 {"label": "共识机制", "value": "Raft", "unit": ""},
+            ],
+        },
+        "core_payment": {
+            "load": _ratio(len(payment_orders), 60),
+            "metrics": [
+                {"label": "支付订单", "value": len(payment_orders), "unit": "笔"},
+                {"label": "成功率", "value": round(payment_ok / payment_processed * 100, 1) if payment_processed else "—",
+                 "unit": "%"},
+                {"label": "自动补偿", "value": payment_compensated, "unit": "笔"},
+            ],
+        },
+        "core_monitor": {
+            "load": _ratio(len(monitor_alerts), 120),
+            "metrics": [
+                {"label": "异常预警", "value": len(monitor_alerts), "unit": "条"},
+                {"label": "高危", "value": monitor_high, "unit": "条"},
+                {"label": "自动处置率",
+                 "value": round(monitor_auto / len(monitor_alerts) * 100, 1) if monitor_alerts else "—", "unit": "%"},
+            ],
+        },
+        "core_review": {
+            "load": _ratio(len(review_records), 200),
+            "metrics": [
+                {"label": "审核样本", "value": len(review_records), "unit": "笔"},
+                {"label": "核心一致性",
+                 "value": round(review_agreed / len(review_auto) * 100, 1) if review_auto else "—", "unit": "%"},
+                {"label": "自动化率",
+                 "value": round(len(review_auto) / len(review_records) * 100, 1) if review_records else "—", "unit": "%"},
+            ],
+        },
+        "core_decision": {
+            "load": _ratio(alert_total + len(monitor_alerts), 120),
+            "metrics": [
+                {"label": "决策建议", "value": _decision_count(), "unit": "条"},
+                {"label": "策略优化记录", "value": _count(OptimizationRecord), "unit": "次"},
+                {"label": "待闭环预警", "value": alert_open, "unit": "条"},
             ],
         },
         "out_score": {
