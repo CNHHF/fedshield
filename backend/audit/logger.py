@@ -26,7 +26,8 @@ ON_CHAIN_ACTIONS = {
 
 def record(actor: str, role: str, action: str, *, target: str = "", data_id: str = "",
            data_type: str = "", node: str = "", operation: str = "查询", result: str = "success",
-           risk_score: float = 0.0, detail: str = "", on_chain: Optional[bool] = None) -> AuditLog:
+           risk_score: float = 0.0, detail: str = "", on_chain: Optional[bool] = None,
+           commit: bool = True) -> AuditLog:
     """写入一条审计日志。
 
     参数说明：
@@ -84,7 +85,10 @@ def record(actor: str, role: str, action: str, *, target: str = "", data_id: str
         )
         log.chainTxId = block.txId
 
-    db.session.commit()
+    if commit:
+        db.session.commit()
+    else:
+        db.session.flush()
     return log
 
 

@@ -640,6 +640,61 @@ class Merchant(TimestampMixin, db.Model):
     tier = db.Column(db.String(16), default="中规模")  # 小规模/中规模/大规模
 
 
+class BusinessConfiguration(TimestampMixin, db.Model):
+    """Encrypted business intake and server-validated rule package, per account."""
+    __tablename__ = 'fs_business_configuration'
+    id = db.Column(db.String(48), primary_key=True)
+    owner = db.Column(db.String(80), nullable=False, index=True)
+    payload = db.Column(db.JSON, nullable=False)
+    state = db.Column(db.String(24), default='analyzed', nullable=False)
+    ruleIds = db.Column(db.JSON, default=list)
+
+
+class WorkbenchRun(TimestampMixin, db.Model):
+    """Persisted local workflow; the source snapshot and ciphertexts stay server-side."""
+
+    __tablename__ = "fs_workbench_run"
+    id = db.Column(db.String(40), primary_key=True)
+    actor = db.Column(db.String(64), nullable=False, index=True)
+    status = db.Column(db.String(20), default="pending")
+    version = db.Column(db.Integer, default=0, nullable=False)
+    config = db.Column(db.JSON, default=dict)
+    source = db.Column(db.JSON, default=list)
+    stages = db.Column(db.JSON, default=list)
+    protected = db.Column(db.JSON, default=list)
+    decisions = db.Column(db.JSON, default=list)
+    reviews = db.Column(db.JSON, default=dict)
+
+
+class WorkbenchMaterial(TimestampMixin, db.Model):
+    __tablename__ = "fs_workbench_material"
+    id = db.Column(db.String(40), primary_key=True)
+    runId = db.Column(db.String(40), nullable=False, index=True)
+    actor = db.Column(db.String(64), nullable=False, index=True)
+    kind = db.Column(db.String(24), nullable=False)
+    filename = db.Column(db.String(160), nullable=False)
+    digest = db.Column(db.String(64), nullable=False)
+    size = db.Column(db.Integer, nullable=False)
+    sealed = db.Column(db.JSON, nullable=False)
+
+
+class WorkbenchImport(TimestampMixin, db.Model):
+    __tablename__ = "fs_workbench_import"
+    id = db.Column(db.String(40), primary_key=True)
+    actor = db.Column(db.String(64), nullable=False, index=True)
+    filename = db.Column(db.String(160), default="")
+    records = db.Column(db.JSON, default=list)
+
+
+class WorkbenchExperiment(TimestampMixin, db.Model):
+    __tablename__ = "fs_workbench_experiment"
+    id = db.Column(db.String(40), primary_key=True)
+    actor = db.Column(db.String(64), nullable=False, index=True)
+    runId = db.Column(db.String(40), nullable=False)
+    kind = db.Column(db.String(32), nullable=False)
+    result = db.Column(db.JSON, default=dict)
+
+
 class Transaction(db.Model):
     """跨境交易明细（用于联合统计与血缘演示）。"""
 

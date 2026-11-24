@@ -395,3 +395,29 @@ JWT 载荷：`{ sub: username, role: <role>, org: <org>, exp, iat, jti }`；角�
 | 5002 | 合规校验未通过（附整改清单） |
 | 5003 | 加密/解密失败 |
 | 5004 | 节点未授权或证书过期 |
+# 本地风控助手与加噪发布
+
+风控问答支持可选的 DeepSeek 解释生成：仅后端读取 `DEEPSEEK_API_KEY`，或本机被忽略的 `instance/deepseek.local.json` 中的 `api_key/model`。本地检索摘要与经基础脱敏的问题发送至 DeepSeek，证据和业务入口由本地系统生成；响应新增 `mode/notice` 表示模型模式或本地降级。测试配置不调用外部服务。配置文件、令牌和密钥不得分发到前端或参赛包中。
+
+`POST /api/assistant/ask`：需登录及 `engine:task:manage`。请求 `{question: string(1–500), topic?: string}`；返回 `answer/topic/citations/actions/asOf/scope/mode`。本地意图识别与业务查询，无外部模型调用，无自动处置。全量演示记录不代表今日数据；仅风控和管理员可访问。
+
+`POST /api/assistant/privacy-release`：需登录及 `budget:manage`。请求 `{values: number[2..1000], lower: number, upper: number, epsilon: number(0.01..10), statistic: "mean"|"sum", budgetId: integer}`。数据按公开边界裁剪，以固定数量替换一条记录为相邻关系；总和敏感度为 `upper-lower`，均值为其除以固定样本量。使用系统随机源采样拉普拉斯噪声。返回 `value/epsilon/sensitivity/noiseScale/statistic/lower/upper/adjacency/note/budget`，不返回原统计量、实际噪声或原始记录。条件更新原子扣减预算，写入趋势与不含原始数据的审计日志。参数错误400、无权限403、预算不存在或不足409。重复发布串行累计 ε，非主体级或整个平台隐私保证。
+
+## 业务工作台（2026-11-05）
+
+`/api/workbench` 复用 Bearer JWT。流程、导入和实验按当前账号隔离；运行、读取与助手要求 `engine:task:manage`，创建及导入要求 `engine:task:create`。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/overview` | 三库计数、模型口径、最近流程、地区 |
+| GET | `/sources?q=&region=&page=1&size=20` | 原始交易分页 |
+| POST | `/imports` | multipart `file`，UTF-8 CSV |
+| GET | `/protected` | 当前账号分级密文与流程来源 |
+| POST | `/runs` | `keys` 2–100 个唯一来源索引，同币种且编号不重复；`budgetId,epsilon,lower,upper,targetRegion,authorized,transferBasis,impactAssessment` |
+| GET | `/runs/<id>` | 流程阶段、依据、密文、初筛及复核结果 |
+| POST | `/runs/<id>/advance` | `stage`：`classify/protect/compliance/risk/audit`，顺序推进；已完成阶段重试幂等 |
+| POST | `/runs/<id>/review` | `code,decision,note`；仅 manual 可复核，decision 为 approve/reject，note 4–300 字 |
+| POST | `/experiments` | `runId,kind`；kind 为 tamper/poisoning，仅隔离副本或合成更新 |
+| POST | `/ask` | `question,runId`；只读证据解释，模型失败回落本地 |
+
+冲突/预算不足返回 409，越权流程读取返回 404。protect 条件扣减预算与密文写入同一事务；audit 状态与存证同一事务。保护、合规、模型及数据仓密钥边界见 [工作台说明](WORKBENCH.md)。

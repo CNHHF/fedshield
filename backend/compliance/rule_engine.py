@@ -97,6 +97,15 @@ def _compare(actual: Any, op: str, expected: Any) -> bool:
 def evaluate_node(node: dict, context: dict) -> tuple[bool, str]:
     """求解单个判断节点，返回 (是否满足, 说明)。"""
     config = node.get("config") or {}
+    if 'expression' in config:
+        from ..engine.rule_schema import validate_expression,summarize
+        expression=validate_expression(config['expression'])
+        def visit(expr):
+            if 'all' in expr:return all(visit(c) for c in expr['all'])
+            if 'any' in expr:return any(visit(c) for c in expr['any'])
+            return _compare(context.get(expr['field']),expr['op'],expr['value'])
+        result=visit(expression)
+        return result,summarize(expression)+' → '+('满足' if result else '不满足')
     field = config.get("field") or node.get("field")
     op = config.get("op", "eq")
     expected = config.get("value", node.get("value"))
@@ -124,6 +133,9 @@ def run_rule(rule: dict, context: dict) -> dict:
 
     trigger = next((node for node in nodes.values() if node.get("type") == "trigger"), None)
     if trigger:
+        business_id=(trigger.get('config') or {}).get('businessConfigId')
+        if business_id and context.get('businessConfigId')!=business_id:
+            return {'code':rule.get('code'),'name':rule.get('name'),'result':'skipped','detail':'未绑定此业务方案','actions':[],'conditions':[]}
         event = (trigger.get("config") or {}).get("event") or trigger.get("event")
         if event and context.get("event") and event != context.get("event"):
             return {
@@ -135,43 +147,16 @@ def run_rule(rule: dict, context: dict) -> dict:
                 "conditions": [],
             }
 
-    condition_nodes = [node for node in nodes.values() if node.get("type") == "condition"]
-    action_nodes = [node for node in nodes.values() if node.get("type") == "action"]
-
-    condition_results = []
-    all_passed = True
-    for node in condition_nodes:
-        passed, detail = evaluate_node(node, context)
-        condition_results.append({"node": node.get("name") or node.get("id"), "passed": passed, "detail": detail})
-        if not passed:
-            all_passed = False
-
-    executed_actions: List[dict] = []
-    if all_passed:
-        for node in action_nodes:
-            config = node.get("config") or {}
-            executed_actions.append(
-                {
-                    "action": config.get("action") or node.get("action"),
-                    "label": node.get("name") or node.get("label"),
-                    "message": config.get("message", ""),
-                    "notify": config.get("notify", []),
-                }
-            )
-
-    actions_set = {item["action"] for item in executed_actions}
-    if not all_passed:
-        verdict = "passed"
-        detail = "判断条件未命中，规则不生效"
-    elif "block" in actions_set:
-        verdict = "blocked"
-        detail = "规则命中，已执行阻断动作"
-    elif actions_set & {"require", "mask"}:
-        verdict = "failed"
-        detail = "规则命中，需补充合规要件或按最小必要原则脱敏"
-    else:
-        verdict = "passed"
-        detail = "规则命中，仅执行告警/存证动作"
+    from .rule_graph import execute
+    try:
+        condition_results,executed_actions,missing_inputs=execute(rule,context,evaluate_node)
+        actions_set={a['action'] for a in executed_actions}
+        if 'block' in actions_set:verdict,detail='blocked','已到达阻断动作'
+        elif missing_inputs:verdict,detail='failed','缺少规则所需输入，须补充数据'
+        elif actions_set & {'require','mask'}:verdict,detail='failed','已到达补充要件或脱敏动作'
+        else:verdict,detail='passed','已执行非阻断动作' if executed_actions else '未到达执行动作，规则未命中'
+    except (ValueError,TypeError,KeyError) as exc:
+        condition_results=[];executed_actions=[];verdict='failed';detail='规则结构无效：'+str(exc)
 
     return {
         "code": rule.get("code"),
@@ -203,6 +188,7 @@ def evaluate(rules: Sequence[dict], context: dict) -> dict:
     for item in blocked + failed:
         condition_issues = 0
         for condition in item["conditions"]:
+            if any(a["action"] in ("block","require","mask") for a in item["actions"]):break
             if condition["passed"]:
                 continue
             condition_issues += 1

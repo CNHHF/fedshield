@@ -16,6 +16,10 @@ import os
 import sys
 import time
 
+# Windows 控制台/管道常使用本地代码页；统一输出为 UTF-8，避免中文或符号编码失败。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 仓库根 fedshield/
 PROJECT = ROOT
 
@@ -588,6 +592,41 @@ def main() -> int:
     check("大脑展板已纳入五大能力脑区",
           {"core_payment", "core_monitor", "core_review", "core_decision"} <= brain_regions,
           f"共 {len(brain_regions)} 个脑区")
+
+    print("\n=== 11b. 本地风控助手与统计加噪 ===")
+    for question in ("当前有哪些高风险预警？", "支付订单有没有异常？", "审核一致性怎么样？", "隐私预算还剩多少？"):
+        r = client.post('/api/assistant/ask', headers=auth, json={'question': question})
+        answer = (r.get_json() or {}).get('data') or {}
+        check('助手：' + question, r.status_code == 200 and bool(answer.get('citations')) and bool(answer.get('answer')))
+    r = client.post('/api/assistant/ask', headers=auth, json={'question': ''})
+    check('助手拒绝空问题', r.status_code == 400)
+    r = client.post('/api/assistant/ask', headers=merchant_auth, json={'question': '风险'})
+    check('商户不能读取全局风控问答', r.status_code == 403)
+    r = client.post('/api/assistant/privacy-release', json={})
+    check('加噪接口必须登录', r.status_code == 401)
+    from backend.models import BudgetItem
+    with app.app_context():
+        item = BudgetItem(project='加噪隔离测试', total=1.0, used=0.0)
+        db.session.add(item)
+        db.session.commit()
+        bid = item.id
+    data = {'values': [-50, 20, 250], 'lower': 0, 'upper': 100,
+            'epsilon': 0.6, 'statistic': 'mean', 'budgetId': bid}
+    r = client.post('/api/assistant/privacy-release', headers=merchant_auth, json=data)
+    check('商户不能扣减全局预算', r.status_code == 403)
+    r = client.post('/api/assistant/privacy-release', headers=auth, json={**data, 'values': ['bad']})
+    check('非法数值不发布', r.status_code == 400)
+    r = client.post('/api/assistant/privacy-release', headers=auth, json={**data, 'epsilon': float('nan')})
+    check('NaN 参数不发布', r.status_code == 400)
+    r = client.post('/api/assistant/privacy-release', headers=auth, json=data)
+    released = (r.get_json() or {}).get('data') or {}
+    check('加噪发布扣减 ε', r.status_code == 200 and released.get('budget', {}).get('remaining') == 0.4)
+    check('使用裁剪推导敏感度', abs(released.get('sensitivity', 0)-100/3) < 1e-8)
+    check('不暴露原值与实际噪声', not ({'original', 'noise', 'raw', 'values'} & released.keys()))
+    r = client.post('/api/assistant/privacy-release', headers=auth, json=data)
+    check('预算不足阻止重复发布', r.status_code == 409)
+    with app.app_context():
+        check('失败发布不多扣预算', abs(db.session.get(BudgetItem, bid).used-0.6) < 1e-8)
 
     print("\n=== 12. 权限边界（零信任） ===")
     r = client.post("/api/engine/tasks", headers=merchant_auth, json={"name": "越权任务", "type": "federated"})

@@ -95,6 +95,22 @@ REGION_EXTRA_FEATURES: Dict[str, List[int]] = {
 REGION_BIAS: Dict[str, float] = {"EU": 0.40, "CN": -0.30, "SEA": 0.55, "US": 0.15, "ME": 0.70, "AF": 0.60}
 
 
+def public_mode():
+    from flask import has_app_context,current_app
+    return has_app_context() and not current_app.testing
+
+def feature_specs():
+    if public_mode():
+        from .public_federated import specs
+        return specs()
+    return FEATURES
+
+def source_metadata():
+    if public_mode():
+        from .public_federated import data
+        return data()[4]
+    return {'datasetId':'synthetic-test-fixture','target':'测试夹具标签'}
+
 def region_weights(region: str) -> np.ndarray:
     """返回某地区的风险成因权重 = 共性成因 + 该地区特有成因。"""
     weights = np.zeros(len(FEATURES), dtype=float)
@@ -124,6 +140,8 @@ def _sigmoid(z: np.ndarray) -> np.ndarray:
 def generate_node_dataset(code: str, region: str, samples: int | None = None,
                           seed: int = RANDOM_STATE) -> Tuple[np.ndarray, np.ndarray]:
     """生成某地区节点的仿真交易风控数据（原始数据仅存本节点）。"""
+    from flask import has_app_context,current_app
+    if has_app_context() and not current_app.testing:raise ValueError('正式环境不生成仿真训练数据，请使用真实库分片')
     profile = REGION_PROFILES.get(region, REGION_PROFILES["EU"])
     # 使用 crc32 而非内置 hash()，保证跨进程、跨机器的数据划分完全可复现
     rng = np.random.default_rng(seed + zlib.crc32(code.encode("utf-8")) % 10_000)
@@ -183,6 +201,10 @@ def generate_mixed_testset(regions: Sequence[str], per_region: int = 1200,
 
     评测集仅用于效果评估，不参与训练，也不涉及任何节点原始数据出域。
     """
+    from flask import has_app_context,current_app
+    if has_app_context() and not current_app.testing:
+        from .public_federated import data
+        _,_,x,y,_=data();return x,y
     features, labels = [], []
     for position, region in enumerate(regions):
         X, y = generate_node_dataset(f"TEST-{region}-{position}", region, samples=per_region,
@@ -194,6 +216,14 @@ def generate_mixed_testset(regions: Sequence[str], per_region: int = 1200,
 
 def build_nodes(codes: Sequence[str], node_meta: Dict[str, dict], seed: int = RANDOM_STATE) -> List[FederatedNode]:
     """按节点编码构建参与方数据（每个节点数据留存本地）。"""
+    from flask import has_app_context,current_app
+    if has_app_context() and not current_app.testing:
+        from . import public_dataset,public_federated
+        if not public_dataset.available():
+            from ..utils.response import ApiError
+            raise ApiError('真实公开数据库未就绪，不生成仿真节点数据',code=503)
+        x,y,_,_,_=public_federated.data()
+        return [FederatedNode(code=code,name=node_meta.get(code,{}).get('name',code)+'（本地真实数据分片）',region=node_meta.get(code,{}).get('region','EU'),samples=len(y[i::len(codes)]),features=x[i::len(codes)],labels=y[i::len(codes)],level='P2') for i,code in enumerate(codes)]
     nodes: List[FederatedNode] = []
     for index, code in enumerate(codes):
         meta = node_meta.get(code, {"name": code, "region": "EU"})
@@ -621,7 +651,15 @@ def federated_train(nodes: Sequence[FederatedNode], rounds: int = 10, epsilon: f
         )
 
     final_probability = _sigmoid(test_X @ w_global + b_global)
-    metrics = classification_metrics(test_y, final_probability)
+    def heldout_metrics(w,b,probability):
+        if public_mode():
+            from .public_federated import calibration
+            cal_x,cal_y=calibration();threshold,_,_=operating_threshold(cal_y,_sigmoid(cal_x@w+b))
+            result=classification_metrics(test_y,probability,threshold=threshold)
+            result['operatingPoint']='仅用独立校准集选择阈值，再原样评估测试集；不保证测试漏检率达标'
+            return result
+        return classification_metrics(test_y,probability)
+    metrics = heldout_metrics(w_global,b_global,final_probability)
 
     # 基线对比：各模型在 **相同的业务合规红线**（漏检率 ≤7%）下各自反推告警阈值，
     # 再比较告警量（人工审核工作量）与精确率 —— 这是风控运营真正关心的可比口径。
@@ -631,31 +669,32 @@ def federated_train(nodes: Sequence[FederatedNode], rounds: int = 10, epsilon: f
         baseline_node.features, baseline_node.labels, np.zeros(dimension), 0.0, epochs=40, lr=lr
     )
     local_probability = _sigmoid(test_X @ local_w + local_b)
-    local_metrics = classification_metrics(test_y, local_probability)
+    local_metrics = heldout_metrics(local_w,local_b,local_probability)
 
     # 基线 2：明文集中建模（不加密、不做差分隐私，理想效果上限）
     all_X = np.vstack([n.features for n in nodes])
     all_y = np.concatenate([n.labels for n in nodes])
     plain_w, plain_b, _ = train_local(all_X, all_y, np.zeros(dimension), 0.0, epochs=40, lr=lr)
     plain_probability = _sigmoid(test_X @ plain_w + plain_b)
-    plain_metrics = classification_metrics(test_y, plain_probability)
+    plain_metrics = heldout_metrics(plain_w,plain_b,plain_probability)
 
     privacy_report = dp.noise_impact(epsilon, sensitivity)
     elapsed_ms = (time.perf_counter() - started) * 1000
 
     return {
         "algorithm": algorithm,
+        "dataSource": source_metadata(),
         "rounds": round_records,
         "metrics": metrics,
         "baseline": {
-            "operatingRule": f"各模型均按漏检率 ≤{metrics['missRateStandard']:.0%} 红线反推告警阈值后对比",
+            "operatingRule": '阈值在独立校准集选择，测试集只评估' if public_mode() else f"各模型按漏检率 ≤{metrics['missRateStandard']:.0%} 反推阈值",
             "localOnly": {
                 "auc": local_metrics["auc"],
                 "missRate": local_metrics["missRate"],
                 "precision": local_metrics["precision"],
                 "alertVolume": local_metrics["alertVolume"],
                 "threshold": local_metrics["threshold"],
-                "note": f"仅 {baseline_node.name} 单地区数据建模（缺少跨地域风险特征）",
+                "note": f"仅 {baseline_node.name} 的本地分片；对同一留出集合评估",
             },
             "plaintext": {
                 "auc": plain_metrics["auc"],
@@ -684,8 +723,8 @@ def federated_train(nodes: Sequence[FederatedNode], rounds: int = 10, epsilon: f
             "allocation": dp.allocate_budget(
                 epsilon,
                 [
-                    {"name": f["name"], "level": f["level"], "contribution": round(abs(float(TRUE_WEIGHTS[i])), 3)}
-                    for i, f in enumerate(FEATURES)
+                    {"name": f["name"], "level": f["level"], "contribution": round(abs(float(w_global[i])), 3)}
+                    for i, f in enumerate(feature_specs())
                 ],
             ),
             **privacy_report,
@@ -701,7 +740,7 @@ def federated_train(nodes: Sequence[FederatedNode], rounds: int = 10, epsilon: f
             "pruning": "幅值剪枝 + 未传输参数沿用上一轮全局值",
             "encoding": "增量 varint 索引 + int16 数值（约 3B/非零参数）",
             "note": "演示模型仅 20 维参数，索引开销占比高；"
-                    "生产环境千维以上模型实测压缩率可达 70% 以上",
+                    "这里只统计参数编码载荷，不代表整个网络流量",
         },
         "homomorphic": {
             "scheme": f"Paillier-{cipher.public_key.bits}",
@@ -713,15 +752,15 @@ def federated_train(nodes: Sequence[FederatedNode], rounds: int = 10, epsilon: f
             "elapsedMs": round(elapsed_ms, 2),
             "features": len(FEATURES),
             "samples": int(sum(n.samples for n in nodes)),
-            "cpuSec": round(elapsed_ms / 1000 * 0.92, 2),
-            "memoryMb": 268,
+            "cpuSec": None if public_mode() else round(elapsed_ms / 1000 * 0.92, 2),
+            "memoryMb": None if public_mode() else 268,
             "nodes": [
                 {"code": n.code, "name": n.name, "region": n.region, "samples": n.samples, "level": n.level}
                 for n in nodes
             ],
         },
         "featureImportance": [
-            {"name": FEATURES[i]["name"], "weight": round(float(w_global[i]), 4), "level": FEATURES[i]["level"]}
+            {"name": feature_specs()[i]["name"], "weight": round(float(w_global[i]), 4), "level": feature_specs()[i]["level"]}
             for i in np.argsort(-np.abs(w_global))
         ][:8],
     }
@@ -731,7 +770,7 @@ def masked_preview(nodes: Sequence[FederatedNode], rows: int = 8) -> dict:
     """中间结果脱敏预览：仅展示脱敏后的字段与统计量，原始值不出域。"""
     columns = [
         {"key": f["key"], "name": f["name"], "level": f["level"], "masked": f["level"] in ("P1", "P2")}
-        for f in FEATURES
+        for f in feature_specs()
     ]
     data = []
     for index in range(min(rows, sum(n.samples for n in nodes))):

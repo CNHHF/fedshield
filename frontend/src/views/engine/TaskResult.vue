@@ -5,7 +5,7 @@
         <h2 class="fs-page__title">计算结果分析</h2>
         <p class="fs-page__subtitle">
           展示最近计算结果：风控模型核心指标、联邦学习每轮收敛曲线、参数传输优化效果与基线对比。
-          所有指标均在密文域计算后由授权节点解密汇总。
+          模型更新在密文域聚合，模型评估在授权解密后完成。
         </p>
       </div>
       <div style="display: flex; gap: 10px; align-items: center">
@@ -31,6 +31,7 @@
       </div>
     </div>
 
+    <el-alert v-if="result?.dataSource?.datasetId==='uci-online-retail-352'" :closable="false" type="info" :title="'真实UCI订单 · '+result.dataSource.target+'；本地处理与分片，不是生产跨境链路。'" style="margin-bottom:20px"/>
     <el-empty v-if="!loading && !hasData" description="暂无计算结果，请先在任务管理中启动一个计算任务">
       <el-button type="primary" @click="router.push('/engine/tasks')">前往任务管理</el-button>
     </el-empty>
@@ -69,9 +70,9 @@
                 <span v-else class="fs-muted">未记录</span>
               </el-descriptions-item>
               <el-descriptions-item label="资源消耗" :span="2">
-                <span>CPU {{ formatNumber(resource.cpuSec, 2) }} s</span>
+                <span>CPU {{resource.cpuSec==null?'未采集':formatNumber(resource.cpuSec,2)+' s'}}</span>
                 <el-divider direction="vertical" />
-                <span>内存 {{ formatNumber(resource.memoryMb, 0) }} MB</span>
+                <span>内存 {{resource.memoryMb==null?'未采集':formatNumber(resource.memoryMb,0)+' MB'}}</span>
                 <el-divider direction="vertical" />
                 <span>耗时 {{ formatDuration(resource.elapsedMs) }}</span>
               </el-descriptions-item>
@@ -82,7 +83,7 @@
             <div class="fs-grid fs-grid--4" style="gap: 10px">
               <StatCard
                 label="风控 AUC"
-                :value="numberOrNull(metric.auc, 4)"
+                :value="formatNumber(metric.auc, 4)"
                 icon="TrendCharts"
                 color="#1f5fd8"
                 sub="越接近 1 判别力越强"
@@ -286,9 +287,9 @@ const baseline = computed(() => payload.value.baseline ?? {})
 const resource = computed(() => {
   const item = result.value?.resource || payload.value.resource || {}
   return {
-    cpuSec: item.cpuSec ?? 0,
+    cpuSec: item.cpuSec,
     // 后端不同模块对内存字段命名不完全一致（resource.memoryMb / resource.memMb），做兼容取值
-    memoryMb: item.memoryMb ?? item.memMb ?? 0,
+    memoryMb: item.memoryMb ?? item.memMb,
     elapsedMs: item.elapsedMs ?? result.value?.durationMs ?? 0
   }
 })

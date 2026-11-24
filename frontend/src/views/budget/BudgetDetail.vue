@@ -13,12 +13,12 @@
       </el-button>
     </div>
 
-    <div class="fs-grid fs-grid--2">
-      <!-- 左区：项目预算明细 -->
-      <div class="fs-card">
+    <div class="fs-grid fs-grid--2 budget-detail-layout">
+      <!-- 项目明细独占整行，避免多列表格挤进半宽容器。 -->
+      <div class="fs-card budget-detail-projects">
         <div class="fs-card__header">
           <div class="fs-card__title">项目预算明细</div>
-          <span class="fs-muted">总预算 {{ formatNumber(totalBudget, 2) }} 元</span>
+          <span class="fs-muted">总预算 {{ formatNumber(totalBudget, 2) }} ε</span>
         </div>
         <div class="fs-card__body">
           <el-table v-loading="loading" :data="items" border stripe empty-text="暂无项目预算数据">
@@ -35,14 +35,18 @@
             <el-table-column label="剩余" width="120" align="right">
               <template #default="{ row }">{{ formatNumber(row.remaining, 2) }}</template>
             </el-table-column>
-            <el-table-column label="已用占比" min-width="160">
+            <el-table-column label="已用占比" min-width="180">
               <template #default="{ row }">
-                <el-progress
-                  :percentage="itemUsedPercent(row)"
-                  :stroke-width="12"
-                  :status="progressStatus(row)"
-                  :format="(percent) => `${percent}%`"
-                />
+                <div class="budget-usage">
+                  <el-progress
+                    :percentage="itemUsedPercent(row)"
+                    :stroke-width="10"
+                    :status="progressStatus(row)"
+                    :show-text="false"
+                    aria-label="已用占比"
+                  />
+                  <span>{{ itemUsedPercent(row) }}%</span>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="级别" width="110">
@@ -60,11 +64,11 @@
         </div>
       </div>
 
-      <!-- 右区：项目间内部调整 -->
+      <!-- 下方并列展示内部调整与占比。 -->
       <div class="fs-card">
         <div class="fs-card__header">
           <div class="fs-card__title">内部调整</div>
-          <span class="fs-muted">单次上限 {{ formatNumber(maxTransfer, 2) }} 元（总预算 10%）</span>
+          <span class="fs-muted">单次上限 {{ formatNumber(maxTransfer, 2) }} ε（总预算 10%）</span>
         </div>
         <div class="fs-card__body">
           <el-form :model="transferForm" label-width="96px">
@@ -78,7 +82,7 @@
                 >
                   <div class="fs-option">
                     <span>{{ item.project }}</span>
-                    <span class="fs-muted">剩余 {{ formatNumber(item.remaining, 2) }} 元</span>
+                    <span class="fs-muted">剩余 {{ formatNumber(item.remaining, 2) }} ε</span>
                   </div>
                 </el-option>
               </el-select>
@@ -109,7 +113,7 @@
                 style="width: 100%"
               />
               <div class="fs-muted fs-mt">
-                不得超过总预算的 10%（{{ formatNumber(maxTransfer, 2) }} 元），超出将被阻止提交。
+                不得超过总预算的 10%（{{ formatNumber(maxTransfer, 2) }} ε），超出将被阻止提交。
               </div>
             </el-form-item>
             <el-form-item label="备注">
@@ -133,8 +137,6 @@
           </el-alert>
         </div>
       </div>
-    </div>
-
     <!-- 各项目 已使用/剩余 占比对比 -->
     <div class="fs-card">
       <div class="fs-card__header">
@@ -144,6 +146,7 @@
       <div class="fs-card__body">
         <ChartBox :option="compareOption" :loading="loading" height="300" empty-text="暂无项目预算数据" />
       </div>
+    </div>
     </div>
 
     <!-- 调整记录报告 -->
@@ -168,7 +171,7 @@
             <template #default="{ row }">{{ row.toProject || '-' }}</template>
           </el-table-column>
           <el-table-column label="调整额度" width="150" align="right">
-            <template #default="{ row }">{{ formatNumber(row.amount || 0, 2) }} 元</template>
+            <template #default="{ row }">{{ formatNumber(row.amount || 0, 2) }} ε</template>
           </el-table-column>
           <el-table-column prop="operator" label="操作人" width="140">
             <template #default="{ row }">{{ row.operator || '-' }}</template>
@@ -184,13 +187,13 @@
     </div>
 
     <!-- 单项额度调整 -->
-    <el-dialog v-model="adjustVisible" title="调整项目预算额度" width="520px" destroy-on-close>
+    <el-dialog v-model="adjustVisible" title="调整项目预算额度" width="min(520px,94vw)" destroy-on-close>
       <el-form ref="adjustFormRef" :model="adjustForm" :rules="adjustRules" label-width="110px">
         <el-form-item label="项目名称">
           <el-input :model-value="adjustForm.project" disabled />
         </el-form-item>
         <el-form-item label="已使用额度">
-          <el-input :model-value="`${formatNumber(adjustForm.used, 2)} 元`" disabled />
+          <el-input :model-value="`${formatNumber(adjustForm.used, 2)} ε`" disabled />
         </el-form-item>
         <el-form-item label="调整后总额度" prop="total">
           <el-input-number
@@ -203,8 +206,8 @@
             style="width: 100%"
           />
           <div class="fs-muted fs-mt">
-            调整后总额度不得低于已使用额度（{{ formatNumber(adjustForm.used, 2) }} 元），
-            调整后剩余 {{ formatNumber(Math.max(adjustForm.total - adjustForm.used, 0), 2) }} 元。
+            调整后总额度不得低于已使用额度（{{ formatNumber(adjustForm.used, 2) }} ε），
+            调整后剩余 {{ formatNumber(Math.max(adjustForm.total - adjustForm.used, 0), 2) }} ε。
           </div>
         </el-form-item>
         <el-form-item label="调整原因" prop="reason">
@@ -398,7 +401,7 @@ async function submitAdjust() {
   }
   // 业务兜底：下调额度不得低于已消耗额度，否则会造成已用占比超过 100%
   if (Number(adjustForm.total) < Number(adjustForm.used)) {
-    ElMessage.warning(`调整后总额度不得低于已使用额度 ${formatNumber(adjustForm.used, 2)} 元`)
+    ElMessage.warning(`调整后总额度不得低于已使用额度 ${formatNumber(adjustForm.used, 2)} ε`)
     return
   }
   adjustSubmitting.value = true
@@ -408,7 +411,7 @@ async function submitAdjust() {
       reason: adjustForm.reason
     })
     ElMessage.success(
-      `额度调整成功，剩余额度 ${formatNumber(data?.remaining ?? 0, 2)} 元（已生成调整记录）`
+      `额度调整成功，剩余额度 ${formatNumber(data?.remaining ?? 0, 2)} ε（已生成调整记录）`
     )
     adjustVisible.value = false
     await load()
@@ -447,13 +450,13 @@ async function submitTransfer() {
   // 硬性规则：内部调整单次不得超过总预算的 10%（后端同样校验）
   if (Number(transferForm.amount) > maxTransfer.value) {
     ElMessage.warning(
-      `内部调整单次不得超过总预算的 10%，当前上限为 ${formatNumber(maxTransfer.value, 2)} 元`
+      `内部调整单次不得超过总预算的 10%，当前上限为 ${formatNumber(maxTransfer.value, 2)} ε`
     )
     return
   }
   const from = items.value.find((item) => item.project === transferForm.fromProject)
   if (from && Number(transferForm.amount) > Number(from.remaining || 0)) {
-    ElMessage.warning(`调出项目剩余额度仅 ${formatNumber(from.remaining, 2)} 元，不足以调出`)
+    ElMessage.warning(`调出项目剩余额度仅 ${formatNumber(from.remaining, 2)} ε，不足以调出`)
     return
   }
 
@@ -480,7 +483,7 @@ const ADJUST_COLUMNS = [
   { label: '调整编号', prop: 'code' },
   { label: '调出项目', prop: 'fromProject' },
   { label: '调入项目', prop: 'toProject' },
-  { label: '调整额度（元）', prop: (row) => formatNumber(row.amount || 0, 2) },
+  { label: '调整额度（ε）', prop: (row) => formatNumber(row.amount || 0, 2) },
   { label: '操作人', prop: 'operator' },
   { label: '调整时间', prop: (row) => formatTime(row.createdAt) },
   { label: '备注', prop: 'note' }
@@ -500,13 +503,31 @@ onMounted(async () => {
     // 项目类别字典来自元数据接口
     await appStore.loadMeta()
   } catch (error) {
-    // 元数据失败时类别列回退展示原始编码
+    // ε数据失败时类别列回退展示原始编码
   }
   await load()
 })
 </script>
 
 <style scoped>
+.budget-detail-layout > .fs-card {
+  min-width: 0;
+  margin-top: 0;
+}
+.budget-detail-projects {
+  grid-column: 1 / -1;
+}
+.budget-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  align-items: center;
+  gap: 10px;
+}
+.budget-usage > span {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .fs-option {
   display: flex;
   align-items: center;

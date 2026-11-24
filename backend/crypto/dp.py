@@ -33,7 +33,8 @@ def laplace_noise(scale: float, rng: random.Random | None = None) -> float:
     if scale <= 0:
         return 0.0
     rng = rng or random
-    u = rng.uniform(-0.5, 0.5)
+    # Keep inverse-CDF sampling off endpoints (SystemRandom may yield exactly zero).
+    u = min(0.5 - 2**-53, max(-0.5 + 2**-53, rng.random() - 0.5))
     return -scale * math.copysign(1.0, u) * math.log(1.0 - 2.0 * abs(u))
 
 

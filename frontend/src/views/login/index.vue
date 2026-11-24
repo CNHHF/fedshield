@@ -5,7 +5,7 @@
         <div class="fs-login__logo">FS</div>
         <div>
           <h1>FedShield</h1>
-          <p>面向全球支付场景的跨境敏感数据合规流通平台</p>
+          <p>面向全球支付的风控与合规工作空间</p>
         </div>
       </div>
 
@@ -31,7 +31,7 @@
       <el-card class="fs-login__card" shadow="never">
         <h2>账号登录</h2>
         <p class="fs-login__tip">
-          采用「口令 + 多因素认证 + 数字证书」三要素校验，登录行为全程上链存证
+          使用项目演示账号进入工作空间
         </p>
 
         <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
@@ -125,16 +125,14 @@ const demoAccounts = [
 ]
 
 const highlights = [
-  { icon: 'Lock', title: '数据可用不可见', desc: '联邦学习 + 同态加密 + 差分隐私，原始数据不出域' },
-  { icon: 'DocumentChecked', title: '合规可追溯', desc: '180+ 国家/地区法规库，规则引擎自动校验与整改' },
-  { icon: 'Link', title: '存证不可篡改', desc: 'Hyperledger Fabric 联盟链哈希存证，监管一键调证' },
-  { icon: 'Odometer', title: '效率不低于明文 80%', desc: '参数压缩与密文聚合优化，黑名单查询响应 ≤300ms' }
+  { icon:'Connection', title:'一条可核验的业务链路', desc:'分级、加密、合规初筛和存证，逐步查看处理依据' },
+  { icon:'Coin', title:'三个有出处的数据视图', desc:'原始交易、政策资料与加密样本，互相追溯' },
+  { icon:'Cpu', title:'让 AI 回到业务现场', desc:'批量初筛、低置信度复核与有依据的助手问答' }
 ]
-
 const metrics = [
-  { value: '3 大场景', label: '联合风控 / 匿踪查询 / 联合统计' },
-  { value: '≤300ms', label: '黑名单查询响应' },
-  { value: '7 年', label: '审计日志留存（GDPR）' }
+  { value:'分级保护', label:'P1 / P2 / P3' },
+  { value:'按需复核', label:'保留异常与低置信度队列' },
+  { value:'过程可查', label:'从处理记录到审计存证' }
 ]
 
 function fill(item) {
@@ -151,8 +149,8 @@ async function onSubmit() {
   loading.value = true
   try {
     await userStore.login({ ...form })
-    ElMessage.success('登录成功，正在进入 AI 风控大脑')
-    router.push(route.query.redirect || '/brain')
+    ElMessage.success('登录成功')
+    router.push(route.query.redirect || '/home')
   } catch (error) {
     // 错误提示已由 axios 拦截器统一处理
   } finally {
@@ -287,4 +285,5 @@ async function onSubmit() {
     display: none;
   }
 }
+.fs-login{background:#f3f7f8}.fs-login__left{background:#edf3f5;color:#17252c}.fs-login__logo{background:#1b6c80;border-radius:8px}.fs-login__brand p,.fs-login__points span,.fs-login__metrics span{color:#5e6a71}.fs-login__metrics{border-color:#d9e3e7}.fs-login__card{border:1px solid #e1e8eb;border-radius:12px}.fs-login__tip{color:#5e6a71}
 </style>

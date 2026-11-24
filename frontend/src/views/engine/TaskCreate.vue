@@ -169,6 +169,7 @@
                 </div>
               </div>
 
+              <el-form-item label="数据使用确认"><el-checkbox v-model="form.hyper.grantConfirmed">我确认本次处理符合所选数据的使用许可及授权范围</el-checkbox></el-form-item>
               <!-- 高级配置：默认收起，避免一次性暴露过多参数 -->
               <el-collapse v-model="activePanels" style="margin-top: 12px">
                 <el-collapse-item name="advanced">
@@ -181,21 +182,21 @@
                     <el-input-number v-model="form.hyper.learningRate" :min="0.001" :max="1" :step="0.01" :precision="3" />
                   </el-form-item>
 
-                  <el-form-item label="树深度">
+                  <el-form-item v-if="false" label="树深度">
                     <el-input-number v-model="form.hyper.treeDepth" :min="2" :max="12" :step="1" />
                     <span class="fs-muted" style="margin-left: 10px">仅梯度提升类模板生效（当前模板为线性/联邦平均，展示用）</span>
                   </el-form-item>
 
                   <el-form-item label="批次大小">
-                    <el-input-number v-model="form.hyper.batchSize" :min="16" :max="2048" :step="16" />
+                    <el-input-number v-model="form.hyper.batchSize" disabled :min="256" :max="256" title="当前本地训练批次固定为256" />
                   </el-form-item>
 
                   <el-form-item label="参数压缩">
-                    <el-switch v-model="form.hyper.quantization" active-text="参数量化压缩（float32→int16 + Top-K 剪枝）" />
+                    <el-switch v-model="form.hyper.quantization" active-text="稀疏参数传输（Top-K；编码固定int16）" />
                   </el-form-item>
 
                   <el-form-item label="传输安全">
-                    <el-switch v-model="form.hyper.mutualTls" active-text="TLS1.3 双向认证（节点证书校验）" />
+                    <el-switch v-model="form.hyper.mutualTls" disabled active-text="双向 TLS 待接入" title="本机仿真未建立真实双向 TLS 节点连接" />
                   </el-form-item>
 
                   <el-form-item label="审计留存">
@@ -250,7 +251,7 @@
               <el-descriptions-item label="隐私预算 ε">{{ form.epsilon.toFixed(1) }}</el-descriptions-item>
               <el-descriptions-item label="迭代轮次">{{ form.rounds }} 轮</el-descriptions-item>
               <el-descriptions-item label="参数压缩">{{ form.hyper.quantization ? '已开启' : '未开启' }}</el-descriptions-item>
-              <el-descriptions-item label="双向认证">{{ form.hyper.mutualTls ? 'TLS1.3 双向' : '单向' }}</el-descriptions-item>
+              <el-descriptions-item label="双向认证">待接入</el-descriptions-item>
               <el-descriptions-item label="审计留存">{{ form.hyper.auditRetentionYears }} 年</el-descriptions-item>
             </el-descriptions>
 
@@ -260,7 +261,7 @@
               :closable="false"
               show-icon
               title="提示"
-              description="提交后任务进入「待启动」状态，需在任务管理页点击启动；启动即开始消耗隐私预算并写入审计存证。"
+              description="提交后在任务管理中启动。任务 ε 用于计算参数，当前未接入统计发布预算账本。"
             />
           </div>
         </div>
@@ -296,11 +297,12 @@ const form = reactive({
   rounds: 10,
   description: '',
   hyper: {
+    grantConfirmed: false,
     learningRate: 0.08,
     treeDepth: 6,
     batchSize: 256,
     quantization: true,
-    mutualTls: true,
+    mutualTls: false,
     auditRetentionYears: 5
   }
 })
@@ -406,7 +408,7 @@ const ENCRYPTION_POLICIES = [
 const FLOW_STEPS = [
   { title: '数据接入（分级）', desc: '自动识别敏感字段并分级为 P1/P2/P3，原始数据留存各参与方节点' },
   { title: '安全传输（加密通道）', desc: 'TLS1.3 双向认证 + 节点证书校验，密文信封跨节点传输' },
-  { title: '隐私计算（密文运算）', desc: '联邦学习 / 同态加密 / 盲签名，计算全程不接触明文' },
+  { title: '隐私计算', desc: '节点本地处理样本，聚合环节采用密文运算' },
   { title: '合规校验（规则引擎）', desc: '出境规则、隐私预算与授权范围校验，未通过则阻断并生成整改清单' },
   { title: '结果应用（落链存证）', desc: '密文摘要与计算请求写入联盟链，结果仅授权方可见' }
 ]

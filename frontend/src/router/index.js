@@ -15,7 +15,7 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta?.public) {
     if (to.path === '/login' && userStore.isLoggedIn) {
-      next('/brain')
+      next('/home')
       return
     }
     next()

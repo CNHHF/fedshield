@@ -41,6 +41,8 @@ def create_app(config_name: str | None = None) -> Flask:
     with app.app_context():
         db.create_all()
         _ensure_schema(app)
+        from .engine.public_dataset import register
+        register()
         _warm_up_caches(app)
 
     app.logger.info("FedShield 后端已就绪：%s", app.config["SQLALCHEMY_DATABASE_URI"])

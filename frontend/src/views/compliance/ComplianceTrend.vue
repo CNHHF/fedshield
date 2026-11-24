@@ -48,9 +48,9 @@
     <el-row :gutter="16" style="margin-top: 16px">
       <el-col :xs="24" :lg="14">
         <div class="fs-card" style="height: 100%">
-          <div class="fs-card__header">
+          <div class="fs-card__header alert-header">
             <span class="fs-card__title">合规预警</span>
-            <div style="display: flex; align-items: center; gap: 10px">
+            <div class="alert-header__actions">
               <el-tag v-if="highCount" type="danger" size="small" effect="dark">高危 {{ highCount }}</el-tag>
               <el-tag v-if="mediumCount" type="warning" size="small" effect="dark">中度 {{ mediumCount }}</el-tag>
               <el-button text type="primary" @click="toggleAll">
@@ -331,17 +331,29 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+.alert-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.alert-header__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .alert-list {
   max-height: 560px;
   overflow-y: auto;
   padding-right: 4px;
 }
 .alert-item {
+  flex-shrink: 0;
   align-items: flex-start;
   margin-bottom: 10px;
 }
 .alert-item :deep(.el-alert__content) {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 .alert-title {
   display: flex;

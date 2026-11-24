@@ -1,7 +1,7 @@
 <template>
-  <div class="fs-page fs-brain">
+  <div :class="['fs-brain', embedded ? 'fs-brain--embedded' : 'fs-page']">
     <!-- 标题区 -->
-    <div class="fs-page__header">
+    <div v-if="!embedded" class="fs-page__header">
       <div>
         <h2 class="fs-page__title">
           <el-icon class="fs-brain__title-icon"><Cpu /></el-icon>
@@ -24,7 +24,7 @@
     </div>
 
     <!-- 大脑运行指标 -->
-    <div class="fs-grid fs-grid--4">
+    <div v-if="!embedded" class="fs-grid fs-grid--4">
       <StatCard
         v-for="(item, index) in data.kpis"
         :key="item.key"
@@ -40,14 +40,14 @@
     <!-- 脑机结构数据流展板 -->
     <div class="fs-card fs-brain__board-card">
       <div class="fs-card__header">
-        <span class="fs-card__title">脑机结构数据流展板</span>
+        <span class="fs-card__title">{{ embedded ? 'AI 风控大脑' : '脑机结构数据流展板' }}</span>
         <div class="fs-brain__legend">
           <span v-for="group in data.groups" :key="group.code" class="fs-brain__legend-item">
             <i :style="{ background: GROUP_COLORS[group.code] }"></i>
             {{ group.name }}
             <em>{{ countOfGroup(group.code) }}</em>
           </span>
-          <span class="fs-brain__legend-tip">节点大小 = 当前负载 · 流动光点 = 数据脉冲</span>
+          <span v-if="!embedded" class="fs-brain__legend-tip">节点大小 = 当前负载 · 流动光点 = 数据脉冲</span>
         </div>
       </div>
       <div class="fs-card__body">
@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <div class="fs-grid fs-grid--2">
+    <div v-if="!embedded" class="fs-grid fs-grid--2">
       <!-- 实时神经脉冲 -->
       <div class="fs-card">
         <div class="fs-card__header">
@@ -136,6 +136,7 @@ import ChartBox from '@/components/ChartBox.vue'
 import StatCard from '@/components/StatCard.vue'
 
 const router = useRouter()
+defineProps({ embedded: Boolean })
 
 const loading = ref(false)
 const autoRefresh = ref(true)

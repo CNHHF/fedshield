@@ -67,10 +67,10 @@
       <StatCard
         label="交易总金额"
         :value="formatNumber(stats.totalAmount, 2)"
-        unit="CNY"
+        :unit="currency"
         icon="Money"
         color="#1f5fd8"
-        :sub="`密文域求和结果，币种 ${stats.currency || 'CNY'}`"
+        :sub="`密文域求和结果，币种 ${currency}`"
       />
       <StatCard
         label="交易笔数"
@@ -81,7 +81,7 @@
         sub="各地区节点本地上报后汇总"
       />
       <StatCard
-        label="对公付款方数"
+        :label="partyLabel"
         :value="formatNumber(stats.counterpartyTotal, 0)"
         unit="户"
         icon="OfficeBuilding"
@@ -102,7 +102,7 @@
       <div class="fs-card">
         <div class="fs-card__header">
           <div class="fs-card__title">分地区统计</div>
-          <span class="fs-muted">柱状：金额（元）　折线：笔数</span>
+          <span class="fs-muted">柱状：金额（{{ currency }}）　折线：笔数</span>
         </div>
         <div class="fs-card__body">
           <ChartBox :option="regionOption" :height="330" empty-text="暂无分地区统计数据" />
@@ -130,7 +130,7 @@
         <div class="fs-card__body">
           <el-table :data="rows" border stripe size="small" style="width: 100%">
             <el-table-column prop="name" label="维度项" min-width="120" />
-            <el-table-column label="交易金额（元）" min-width="150">
+            <el-table-column :label="`交易金额（${currency}）`" min-width="150">
               <template #default="{ row }">{{ formatNumber(row.amount, 2) }}</template>
             </el-table-column>
             <el-table-column label="金额占比" width="110">
@@ -139,7 +139,7 @@
             <el-table-column v-if="query.dimension === 'region'" label="交易笔数" width="110">
               <template #default="{ row }">{{ formatNumber(row.count, 0) }}</template>
             </el-table-column>
-            <el-table-column v-if="query.dimension === 'region'" label="对公付款方数" width="130">
+            <el-table-column v-if="query.dimension === 'region'" :label="partyLabel" width="130">
               <template #default="{ row }">{{ formatNumber(row.counterparties, 0) }}</template>
             </el-table-column>
             <template #empty>
@@ -208,6 +208,8 @@ import { exportCsv } from '@/utils/download'
 
 const loading = ref(false)
 const stats = ref({})
+const currency = computed(() => stats.value.currency || '—')
+const partyLabel = computed(() => stats.value.dataSource?.datasetId === 'uci-online-retail-352' ? '匿名客户数（地区内去重）' : '对公付款方数')
 const steps = ref([])
 const rows = ref([])
 
@@ -252,7 +254,7 @@ const regionOption = computed(() =>
       axisLabel: { interval: 0 }
     },
     yAxis: [
-      { type: 'value', name: '金额(元)', axisLabel: { formatter: (value) => formatNumber(value, 0) } },
+      { type: 'value', name: `金额(${currency.value})`, axisLabel: { formatter: (value) => formatNumber(value, 0) } },
       { type: 'value', name: '笔数', axisLabel: { formatter: (value) => formatNumber(value, 0) } }
     ],
     series: [
@@ -279,7 +281,7 @@ const regionOption = computed(() =>
 const categoryOption = computed(() => {
   const total = byCategory.value.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
   return baseChartOption({
-    tooltip: { trigger: 'item', formatter: '{b}：{c} 元（{d}%）' },
+    tooltip: { trigger: 'item', formatter: `{b}：{c} ${currency.value}（{d}%）` },
     legend: { bottom: 0, type: 'scroll', icon: 'circle', itemWidth: 10, itemHeight: 10 },
     series: [
       {
@@ -357,14 +359,14 @@ function handleExport() {
     query.dimension === 'category'
       ? [
           { prop: 'name', label: `${dimensionName}` },
-          { prop: (row) => formatNumber(row.amount, 2), label: '交易金额(元)' },
+          { prop: (row) => formatNumber(row.amount, 2), label: `交易金额(${currency.value})` },
           { prop: (row) => formatPercent(row.share, 2), label: '金额占比' }
         ]
       : [
           { prop: 'name', label: `${dimensionName}` },
-          { prop: (row) => formatNumber(row.amount, 2), label: '交易金额(元)' },
+          { prop: (row) => formatNumber(row.amount, 2), label: `交易金额(${currency.value})` },
           { prop: (row) => formatNumber(row.count, 0), label: '交易笔数' },
-          { prop: (row) => formatNumber(row.counterparties, 0), label: '对公付款方数' },
+          { prop: (row) => formatNumber(row.counterparties, 0), label: partyLabel.value },
           { prop: (row) => formatPercent(row.share, 2), label: '金额占比' }
         ]
 

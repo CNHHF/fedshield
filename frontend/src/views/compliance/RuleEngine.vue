@@ -4,12 +4,13 @@
       <div>
         <h2 class="fs-page__title">规则引擎配置</h2>
         <p class="fs-page__subtitle">
-          可视化编排跨境数据合规规则：从左侧拖拽「触发条件 → 判断条件 → 执行动作」节点到画布，连线定义执行顺序，
-          点击节点在右侧编辑属性。规则保存后由后端规则引擎在数据出境前实时执行。
+          从业务材料生成规则组，或在画布中调整条件与动作。
         </p>
       </div>
       <div class="fs-toolbar" style="margin-bottom: 0">
         <el-button :icon="Plus" @click="onNewRule">新建规则</el-button>
+        <el-button type="primary" plain @click="businessOpen=true">业务智能配置</el-button>
+        <el-button @click="draftOpen=true">AI 配置规则</el-button>
         <el-button :icon="Delete" @click="onClearCanvas">清空画布</el-button>
         <el-button type="primary" :icon="Select" :loading="saving" @click="onSaveRule">
           {{ editingId ? '保存修改' : '保存规则' }}
@@ -17,6 +18,11 @@
       </div>
     </div>
 
+    <el-dialog v-model="draftOpen" title="AI 配置规则" width="min(760px,94vw)" append-to-body :show-close="!draftBusy" :close-on-click-modal="!draftBusy" :close-on-press-escape="!draftBusy">
+      <el-input v-model="draftQuestion" type="textarea" :rows="5" maxlength="500" :disabled="draftBusy" placeholder="描述处理地区、数据级别、金额条件、缺失材料及需要执行的动作；可使用且、或条件组。"/>
+      <template #footer><el-button :disabled="draftBusy" @click="draftOpen=false">取消</el-button><el-button type="primary" :loading="draftBusy" :disabled="draftQuestion.trim().length<8" @click="generateDraft">生成并配置画布</el-button></template>
+    </el-dialog>
+    <BusinessConfigurator v-model="businessOpen" @preview="previewBusinessRule" @saved="loadRules" />
     <!-- 基础信息：规则名称/场景/优先级/启用状态 -->
     <div class="fs-card">
       <div class="fs-card__header">
@@ -199,6 +205,9 @@
                 </template>
 
                 <!-- 判断条件 -->
+                <template v-else-if="selectedNode.type === 'condition' && selectedNode.config.expression">
+                  <RuleExpressionEditor v-model="selectedNode.config.expression"/>
+                </template>
                 <template v-else-if="selectedNode.type === 'condition'">
                   <el-form-item label="判断字段 field">
                     <el-select v-model="selectedNode.config.field" placeholder="选择判断字段" style="width: 100%" filterable allow-create>
@@ -345,6 +354,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, Delete, Plus, Refresh, Select } from '@element-plus/icons-vue'
 import { complianceApi } from '@/api'
 import { formatTime } from '@/utils/format'
+import RuleExpressionEditor from '@/components/RuleExpressionEditor.vue'
+import BusinessConfigurator from '@/components/BusinessConfigurator.vue'
 
 /* ---------------- 画布与节点尺寸常量 ---------------- */
 const CANVAS_WIDTH = 1100
@@ -441,6 +452,20 @@ const ruleForm = reactive({
   enabled: true
 })
 const editingId = ref(null) // 非空表示编辑已有规则，保存时走 PUT
+const businessOpen=ref(false)
+async function previewBusinessRule(rule){
+ if(nodes.value.length){try{await ElMessageBox.confirm('将使用这条业务规则替换当前画布，未保存的修改会丢失。','查看规则画布',{confirmButtonText:'替换画布',cancelButtonText:'取消'})}catch{return}}
+ const copy=JSON.parse(JSON.stringify(rule))
+ editingId.value=null;selectedId.value='';Object.assign(ruleForm,{name:copy.name,description:copy.description,scene:copy.scene,priority:copy.priority,enabled:false});nodes.value=copy.nodes;edges.value=copy.edges;businessOpen.value=false
+}
+const draftOpen=ref(false),draftQuestion=ref(''),draftBusy=ref(false),draftResult=ref(null)
+async function generateDraft(){
+ if(draftBusy.value)return
+ if(nodes.value.length){try{await ElMessageBox.confirm('AI将替换当前画布，未保存的编辑会丢失。','生成规则配置',{confirmButtonText:'继续生成',cancelButtonText:'取消'})}catch{return}}
+ const previousId=editingId.value,current=nodes.value.length?buildPayload():null
+ draftBusy.value=true;draftResult.value=null
+ try{const d=await complianceApi.draftRule(draftQuestion.value,current);draftResult.value=d;editingId.value=previousId;selectedId.value='';Object.assign(ruleForm,{name:d.name,description:d.description,scene:d.scene,priority:d.priority,enabled:false});nodes.value=d.nodes;edges.value=d.edges;draftOpen.value=false;ElMessage.success('AI已配置画布，检查后可保存规则')}catch{}finally{draftBusy.value=false}
+}
 const ruleList = ref([])
 const ruleQuery = reactive({ scene: '', enabled: '' })
 
@@ -507,10 +532,12 @@ function linePath(source, target) {
 }
 
 /** 节点摘要：让画布上一眼能看出判断口径/动作，无需逐个点开属性面板 */
+function expressionSummary(expr){if(expr.all)return expr.all.map(expressionSummary).join(' 且 ');if(expr.any)return '('+expr.any.map(expressionSummary).join(' 或 ')+')';return expr.field+' '+expr.op+' '+String(expr.value)}
 function configSummary(node) {
   const config = node.config || {}
   if (node.type === 'trigger') return config.event ? `事件：${config.event}` : '未设置触发事件'
   if (node.type === 'condition') {
+    if(config.expression)return expressionSummary(config.expression)
     if (!config.field && !config.op) return '未设置判断条件'
     return `${config.field || 'field'} ${config.op || 'op'} ${config.value ?? ''}`.trim()
   }
@@ -784,6 +811,11 @@ async function onSaveRule() {
     return
   }
   const payload = buildPayload()
+  if(payload.nodes.some(n=>n.type==='trigger'&&n.config.businessConfigId)){
+    if(!editingId.value){ElMessage.warning('请先在业务智能配置中确认并保存规则组');return}
+    try{await ElMessageBox.confirm('请核对业务规则的数值、条件和动作。修改将用于绑定此方案的后续流程。','确认业务规则修改',{confirmButtonText:'确认修改',cancelButtonText:'返回检查'})}catch{return}
+    payload.businessConfirmed=true
+  }
   saving.value = true
   try {
     if (editingId.value) {

@@ -101,7 +101,7 @@
               ref="chartBoxRef"
               :option="chartOption"
               :loading="loading"
-              height="580"
+              :height="580"
               empty-text="当前筛选条件下暂无血缘数据"
               @vue:mounted="attachChartEvents"
             />

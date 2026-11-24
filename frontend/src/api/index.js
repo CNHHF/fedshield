@@ -1,5 +1,43 @@
 import request from './request'
 
+export const workbenchApi = {
+  provenance: () => request.get('/workbench/provenance'),
+  publicRecord: (code, page=1) => request.get(`/workbench/public-records/${encodeURIComponent(code)}`, { params:{page} }),
+  overview: () => request.get('/workbench/overview'),
+  sources: (params) => request.get('/workbench/sources', { params }),
+  importCsv: (file) => { const data = new FormData(); data.append('file', file); return request.post('/workbench/imports', data) },
+  protected: () => request.get('/workbench/protected'),
+  create: (data) => request.post('/workbench/runs', data),
+  run: (id) => request.get(`/workbench/runs/${id}`),
+  precheck: (id) => request.get(`/workbench/runs/${id}/precheck`),
+  report: (id) => request.get(`/workbench/runs/${id}/report`),
+  material: (id, kind, file) => {const data=new FormData();data.append('kind',kind);data.append('file',file);return request.post(`/workbench/runs/${id}/materials`,data)},
+  downloadMaterial: (id, materialId) => request.get(`/workbench/runs/${id}/materials/${materialId}`, { responseType:'blob' }),
+  advance: (id, stage) => request.post(`/workbench/runs/${id}/advance`, { stage }, { timeout: 120000 }),
+  review: (id, data) => request.post(`/workbench/runs/${id}/review`, data),
+  experiment: (data) => request.post('/workbench/experiments', data),
+  ask: (data) => request.post('/workbench/ask', data, { timeout: 60000 })
+}
+
+export const financeApi = {
+  overview: () => request.get('/finance/overview'),
+  source: (id) => request.get(`/finance/sources/${encodeURIComponent(id)}`),
+  transactions: (params) => request.get('/finance/transactions',{params}),
+  transaction: (id) => request.get(`/finance/transactions/${encodeURIComponent(id)}`),
+  account: (id) => request.get(`/finance/accounts/${encodeURIComponent(id)}`),
+  model: () => request.get('/finance/model'),
+  fx: () => request.get('/finance/fx'),
+  convert: (data) => request.post('/finance/fx/convert',data),
+  macro: (params) => request.get('/finance/macro',{params}),
+  screen: (name) => request.post('/finance/screen',{name}),
+  schema: () => request.get('/finance/schema')
+}
+
+export const assistantApi = {
+  ask: (data) => request.post('/assistant/ask', data),
+  privacyRelease: (data) => request.post('/assistant/privacy-release', data)
+}
+
 /* ---------------- 认证与用户 ---------------- */
 export const authApi = {
   login: (data) => request.post('/auth/login', data),
@@ -93,6 +131,14 @@ export const engineApi = {
 
 /* ---------------- 合规校验与报告 ---------------- */
 export const complianceApi = {
+  draftRule: (question, currentRule=null) => request.post('/compliance/rules/draft', {question,currentRule}),
+  analyzeBusiness: (payload) => request.post('/compliance/business/analyze', payload),
+  businessPlans: () => request.get('/compliance/business/plans'),
+  businessHistory: () => request.get('/compliance/business/history'),
+  extractBusiness: (file) => { const data=new FormData();data.append('file',file);return request.post('/compliance/business/extract',data) },
+  getBusinessPlan: (id) => request.get(`/compliance/business/plans/${id}`),
+  simulateBusiness: (id,contexts,ruleIds) => request.post(`/compliance/business/plans/${id}/simulate`,{contexts,ruleIds}),
+  applyBusiness: (id,ruleIds,confirmedRuleIds) => request.post(`/compliance/business/plans/${id}/apply`,{ruleIds,confirmedRuleIds,confirmed:true}),
   rules: (params) => request.get('/compliance/rules', { params }),
   createRule: (data) => request.post('/compliance/rules', data),
   updateRule: (id, data) => request.put(`/compliance/rules/${id}`, data),

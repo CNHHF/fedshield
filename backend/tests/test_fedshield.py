@@ -148,6 +148,14 @@ class TestEngine(unittest.TestCase):
             for _ in range(200)
         ]
         result = joint_stats.joint_statistics(transactions, epsilon=1.5)
+        self.assertEqual(result['currency'], 'CNY')
+        gbp = joint_stats.joint_statistics([dict(tx, currency='GBP') for tx in transactions], epsilon=1.5)
+        gbp['dataSource'] = {'datasetId':'uci-online-retail-352'}
+        self.assertEqual(gbp['currency'], 'GBP')
+        self.assertIn('交易金额(GBP)', joint_stats.build_report_rows(gbp)[0])
+        self.assertIn('匿名客户数（地区内去重）', joint_stats.build_report_rows(gbp)[0])
+        with self.assertRaises(ValueError):
+            joint_stats.joint_statistics([{'amount':1,'currency':'GBP'},{'amount':1,'currency':'CNY'}])
         self.assertLessEqual(result["errorRate"], 0.01)  # 误差率指标 ≤1%
         self.assertTrue(result["errorPass"])
         self.assertEqual(len(result["byRegion"]), 3)

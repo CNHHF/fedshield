@@ -69,6 +69,10 @@ def joint_statistics(transactions: Sequence[dict], epsilon: float = 1.5,
 
     # ---------------- 步骤 1：地区本地聚合 ----------------
     t0 = time.perf_counter()
+    currencies = {str(tx.get('currency') or 'CNY').upper() for tx in transactions}
+    if len(currencies) > 1:
+        raise ValueError('不同币种不能直接合并金额统计')
+    currency = next(iter(currencies), 'CNY')
     buckets = _aggregate_locally(transactions)
     if not buckets:
         raise ValueError("没有可统计的交易数据")
@@ -77,7 +81,7 @@ def joint_statistics(transactions: Sequence[dict], epsilon: float = 1.5,
             "name": "各地区节点本地聚合",
             "ms": round((time.perf_counter() - t0) * 1000, 2),
             "cipher": "—",
-            "detail": f"{len(buckets)} 个地区节点完成本地聚合，交易明细不出域",
+            "detail": f"本机按地区分组聚合 {len(buckets)} 份数据，不代表已接入境外节点",
         }
     )
 
@@ -89,10 +93,10 @@ def joint_statistics(transactions: Sequence[dict], epsilon: float = 1.5,
     }
     steps.append(
         {
-            "name": "P1 级收付款方信息同态加密",
+            "name": "地区计数同态加密",
             "ms": round((time.perf_counter() - t0) * 1000, 2),
             "cipher": f"Paillier-{cipher.public_key.bits}",
-            "detail": f"{len(encrypted_counterparties)} 个地区的对公付款方数量完成加密（SM4+Paillier 双重保护）",
+            "detail": f"{len(encrypted_counterparties)} 份地区计数使用Paillier加密；不对真实身份字段进行此项计算",
         }
     )
 
@@ -169,7 +173,7 @@ def joint_statistics(transactions: Sequence[dict], epsilon: float = 1.5,
             "name": "生成监管申报口径统计",
             "ms": round((time.perf_counter() - t0) * 1000, 2),
             "cipher": "—",
-            "detail": "输出全球交易总金额、分地区笔数、商品类别占比，可直接用于海关/VAT 申报",
+            "detail": "输出分组金额、笔数及类别占比，仅作统计核查，不构成正式监管申报",
         }
     )
 
@@ -178,7 +182,7 @@ def joint_statistics(transactions: Sequence[dict], epsilon: float = 1.5,
         "dimension": dimension,
         "totalAmount": round(noisy_total, 2),
         "trueAmount": round(true_total, 2),
-        "currency": "CNY",
+        "currency": currency,
         "txCount": int(sum(bucket["count"] for bucket in buckets.values())),
         "counterpartyTotal": int(counterparty_total),
         "byRegion": by_region,
@@ -211,9 +215,9 @@ def build_report_rows(result: dict) -> List[dict]:
         rows.append(
             {
                 "地区": item["name"],
-                "交易金额(元)": item["amount"],
+                f"交易金额({result.get('currency', 'CNY')})": item["amount"],
                 "交易笔数": item["count"],
-                "对公付款方数": item["counterparties"],
+                ("匿名客户数（地区内去重）" if result.get('dataSource', {}).get('datasetId') == 'uci-online-retail-352' else "对公付款方数"): item["counterparties"],
                 "金额占比": f"{item['share'] * 100:.2f}%",
             }
         )

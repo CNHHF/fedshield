@@ -14,13 +14,18 @@ import ast
 import os
 import re
 import subprocess
+import shutil
 import sys
 
+# Windows 控制台/管道常使用本地代码页；统一输出为 UTF-8，避免中文或符号编码失败。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
 ROOT = os.path.dirname(os.path.abspath(__file__))          # fedshield/tools
 PROJECT = os.path.dirname(ROOT)                             # fedshield（仓库根）
 BACKEND = os.path.join(PROJECT, "backend")
 FRONTEND = os.path.join(PROJECT, "frontend")
-NODE = r"C:\Users\admin\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
+NODE = os.getenv("FEDSHIELD_NODE") or shutil.which("node") or "node"
 
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
              "source", "track", "wbr"}

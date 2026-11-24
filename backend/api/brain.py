@@ -189,8 +189,15 @@ def collect_brain_metrics() -> dict:
     """采集各脑区的实时业务指标与负载。"""
     tx_count = _count(Transaction)
     tx_amount = _sum(Transaction, Transaction.amount)
+    from ..engine import public_dataset
+    real_data=public_dataset.available()
+    if real_data:
+        with public_dataset.connect() as c:
+            tx_count,tx_pence=c.execute("SELECT COUNT(*),SUM(amount_pence) FROM orders WHERE status='purchase'").fetchone()
+        tx_amount=tx_pence/100
     sanction_count = _count(SanctionEntry)
     dataset_count = _count(Dataset)
+    if real_data:dataset_count=1
     regulation_stats = regulation_lib.coverage_stats()
 
     task_total = _count(ComputeTask)
@@ -242,7 +249,7 @@ def collect_brain_metrics() -> dict:
             "load": _ratio(tx_count, 3000),
             "metrics": [
                 {"label": "交易笔数", "value": tx_count, "unit": "笔"},
-                {"label": "金额合计", "value": round(tx_amount / 1e4, 2), "unit": "万元"},
+                {"label": "金额合计", "value": round(tx_amount / 1e4, 2), "unit": "万 GBP" if real_data else "万元（历史仿真）"},
             ],
         },
         "src_sanction": {
@@ -256,7 +263,7 @@ def collect_brain_metrics() -> dict:
             "load": _ratio(dataset_count, 12),
             "metrics": [
                 {"label": "数据集", "value": dataset_count, "unit": "个"},
-                {"label": "P1 级数据集", "value": _count(Dataset, Dataset.level == "P1"), "unit": "个"},
+                {"label": "匿名来源主体" if real_data else "P1 级数据集", "value": 1 if real_data else _count(Dataset, Dataset.level == "P1"), "unit": "个"},
             ],
         },
         "src_regulation": {
@@ -270,7 +277,7 @@ def collect_brain_metrics() -> dict:
             "load": _ratio(task_total, 12),
             "metrics": [
                 {"label": "建模任务", "value": f"{task_finished}/{task_total}", "unit": "完成/总"},
-                {"label": "模型 AUC", "value": auc if auc is not None else "—", "unit": ""},
+                {"label": "取消标记AUC" if real_data else "历史模型 AUC", "value": auc if auc is not None else "—", "unit": ""},
                 {"label": "漏检率", "value": miss_rate if miss_rate is not None else "—", "unit": ""},
             ],
         },
@@ -310,7 +317,7 @@ def collect_brain_metrics() -> dict:
             "metrics": [
                 {"label": "区块高度", "value": chain_blocks, "unit": ""},
                 {"label": "存证日志", "value": audit_total, "unit": "条"},
-                {"label": "共识机制", "value": "Raft", "unit": ""},
+                {"label": "存证方式", "value": "本地哈希链", "unit": ""},
             ],
         },
         "core_payment": {
@@ -447,7 +454,7 @@ def overview():
         {"key": "flows", "label": "数据通路", "value": len(flows), "unit": "条",
          "sub": "感知→脑区→决策全链路脉冲"},
         {"key": "nodes", "label": "在线协作节点", "value": node_online, "unit": "个",
-         "sub": "跨境多活节点，TLS1.3 双向认证"},
+         "sub": "本地节点配置；双向TLS未接入"},
         {"key": "tasks", "label": "大脑决策任务", "value": last_task.code if last_task else 0, "unit": "",
          "sub": f"已完成 {result.get('metrics', {}).get('auc', '—')} AUC 的联合建模" if result else "尚未执行联邦建模"},
         {"key": "audit", "label": "神经脉冲（审计）", "value": audit_total, "unit": "条",

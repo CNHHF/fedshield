@@ -1,150 +1,22 @@
 <template>
-  <div class="fs-sidebar">
-    <div class="fs-sidebar__brand">
-      <div class="fs-sidebar__logo">FS</div>
-      <div v-show="!collapsed" class="fs-sidebar__title">
-        <strong>FedShield</strong>
-        <span>跨境隐私计算平台 v1.0</span>
-      </div>
-    </div>
-
-    <el-scrollbar class="fs-sidebar__scroll">
-      <el-menu
-        :default-active="activePath"
-        :collapse="collapsed"
-        :collapse-transition="false"
-        background-color="transparent"
-        text-color="#b6c2d4"
-        active-text-color="#ffffff"
-        router
-      >
-        <template v-for="group in menus" :key="group.name">
-          <el-sub-menu v-if="group.children.length > 1" :index="group.name">
-            <template #title>
-              <el-icon><component :is="group.icon" /></el-icon>
-              <span>{{ group.name }}</span>
-            </template>
-            <el-menu-item v-for="item in group.children" :key="item.path" :index="item.path">
-              <el-icon><component :is="item.icon" /></el-icon>
-              <template #title>{{ item.title }}</template>
-            </el-menu-item>
-          </el-sub-menu>
-
-          <el-menu-item v-else :index="group.children[0].path">
-            <el-icon><component :is="group.children[0].icon" /></el-icon>
-            <template #title>{{ group.children[0].title }}</template>
-          </el-menu-item>
-        </template>
-      </el-menu>
-    </el-scrollbar>
-
-    <div v-show="!collapsed" class="fs-sidebar__footer">
-      <div class="fs-sidebar__footer-item">
-        <el-icon><Lock /></el-icon>
-        <span>TLS1.3 双向认证 · 已连接</span>
-      </div>
-      <div class="fs-sidebar__footer-item">
-        <el-icon><Link /></el-icon>
-        <span>Fabric 存证节点 · 正常</span>
-      </div>
-    </div>
-  </div>
+  <nav class="fs-sidebar" aria-label="主导航">
+    <router-link class="fs-sidebar__brand" :to="'/home'"><svg viewBox="0 0 36 40" width="28" height="32" aria-hidden="true"><path d="M18 2 32 8v11c0 9-7 15-14 19C11 34 4 28 4 19V8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 13h13M12 13v15m0-9h10" stroke="currentColor" stroke-width="2"/></svg><strong v-show="!collapsed">FedShield</strong></router-link>
+    <el-scrollbar class="fs-sidebar__scroll"><div v-if="!collapsed" class="fs-sidebar__scope">全球支付风控工作空间</div><div v-if="primary.length" class="fs-sidebar__primary"><router-link v-for="item in primary" :key="item.path" :to="item.path" :title="item.title" @click="$emit('navigate')"><el-icon><component :is="item.icon"/></el-icon><span v-show="!collapsed">{{ item.title }}</span></router-link></div>
+    <el-menu :default-active="route.path" :collapse="collapsed" :collapse-transition="false" router @select="$emit('navigate')"><el-sub-menu v-for="g in groups" :key="g.name" :index="g.name"><template #title><el-icon><component :is="g.icon"/></el-icon><span>{{ g.name }}</span></template><el-menu-item v-for="item in g.children" :key="item.path" :index="item.path"><span>{{ item.title }}</span></el-menu-item></el-sub-menu></el-menu></el-scrollbar>
+    <div class="fs-sidebar__footer" v-show="!collapsed"><span class="fs-sidebar__dot"/>本地演示环境</div>
+  </nav>
 </template>
-
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { buildMenus } from '@/router/routes'
-
-defineProps({
-  collapsed: { type: Boolean, default: false }
-})
-
-const route = useRoute()
-const userStore = useUserStore()
-
-const activePath = computed(() => route.path)
-const menus = computed(() => buildMenus((permission) => userStore.hasPermission(permission)))
+defineProps({collapsed:Boolean});defineEmits(['navigate'])
+const route=useRoute(),user=useUserStore()
+const menus=computed(()=>buildMenus(p=>user.hasPermission(p)))
+const primary=computed(()=>[...menus.value.flatMap(g=>g.children).filter(i=>['/workbench','/data','/ops/assistant'].includes(i.path))].sort((a,b)=>['/workbench','/data','/ops/assistant'].indexOf(a.path)-['/workbench','/data','/ops/assistant'].indexOf(b.path)))
+const groups=computed(()=>menus.value.map(g=>({...g,children:g.children.filter(i=>!primary.value.some(p=>p.path===i.path))})).filter(g=>g.children.length))
 </script>
-
 <style scoped>
-.fs-sidebar {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.fs-sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 58px;
-  padding: 0 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-.fs-sidebar__logo {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #2f7bff, #14d0a0);
-  color: #fff;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-.fs-sidebar__title {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-  color: #fff;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.fs-sidebar__title strong {
-  font-size: 15px;
-  letter-spacing: 0.4px;
-}
-.fs-sidebar__title span {
-  font-size: 11px;
-  color: #8798b0;
-}
-.fs-sidebar__scroll {
-  flex: 1;
-  padding: 8px 0;
-}
-.fs-sidebar__footer {
-  padding: 10px 16px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  color: #7d8ea6;
-  font-size: 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.fs-sidebar__footer-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-:deep(.el-menu) {
-  border-right: none;
-}
-:deep(.el-menu-item.is-active) {
-  background: linear-gradient(90deg, rgba(47, 123, 255, 0.9), rgba(47, 123, 255, 0.35)) !important;
-  border-radius: 6px;
-}
-:deep(.el-menu-item),
-:deep(.el-sub-menu__title) {
-  height: 42px;
-  line-height: 42px;
-  margin: 2px 8px;
-  border-radius: 6px;
-}
-:deep(.el-menu-item:hover),
-:deep(.el-sub-menu__title:hover) {
-  background: rgba(255, 255, 255, 0.06) !important;
-}
+.fs-sidebar{display:flex;flex-direction:column;height:100%;color:#343b40}.fs-sidebar__brand{height:72px;padding:0 22px;display:flex;align-items:center;gap:12px;color:#1b6c80}.fs-sidebar__brand strong{font-size:20px;color:#1b292e;letter-spacing:-.5px}.fs-sidebar__scroll{flex:1}.fs-sidebar__scope{padding:8px 22px 18px;font-size:12px;color:#626d73}.fs-sidebar__primary{display:grid;gap:4px;padding:0 12px 20px}.fs-sidebar__primary a{height:40px;padding:0 12px;display:flex;gap:12px;align-items:center;border-radius:6px;color:#535e64;white-space:nowrap}.fs-sidebar__primary a:hover{background:#eaf0f1}.fs-sidebar__primary .router-link-active{background:#e3eaec;color:#152a32;font-weight:600}.fs-sidebar__primary .el-icon{font-size:18px}.fs-sidebar__footer{padding:20px 22px;font-size:12px;color:#667176;display:flex;align-items:center;gap:8px}.fs-sidebar__dot{width:6px;height:6px;border-radius:50%;background:#1b6c80}:deep(.el-menu){border:0;background:transparent;--el-menu-bg-color:transparent;--el-menu-hover-bg-color:#eaf0f1;--el-menu-text-color:#535e64;--el-menu-active-color:#152a32}:deep(.el-sub-menu__title),:deep(.el-menu-item){height:38px;line-height:38px;border-radius:6px;margin:3px 12px}:deep(.el-menu-item.is-active){background:#e3eaec;font-weight:600}:deep(.el-sub-menu .el-menu-item){padding-left:42px!important;font-size:13px}:deep(.el-menu--collapse .el-sub-menu__title){padding-left:12px!important}
 </style>

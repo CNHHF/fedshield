@@ -19,13 +19,19 @@ export const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/brain',
+    redirect: '/home',
     children: [
+      { path: 'workbench', name: 'Workbench', component: () => import('@/views/workbench/Workbench.vue'),
+        meta: { title: '业务工作台', icon: 'Connection', group: '工作空间', permission: 'engine:task:manage' } },
+      { path: 'data', name: 'DataVault', component: () => import('@/views/workbench/DataVault.vue'),
+        meta: { title: '数据资产', icon: 'Coin', group: '工作空间', permission: 'engine:task:manage' } },
+      { path: 'security-lab', name: 'SecurityLab', component: () => import('@/views/workbench/SecurityLab.vue'),
+        meta: { title: '安全实验室', icon: 'Aim', group: '补充实验', permission: 'engine:task:manage' } },
       {
         path: 'brain',
         name: 'Brain',
         component: () => import('@/views/brain/index.vue'),
-        meta: { title: 'AI 风控大脑', icon: 'Cpu', group: '智能大脑' }
+        meta: { title: 'AI 风控大脑', icon: 'Cpu', group: '智能大脑', hidden: true }
       },
       {
         path: 'home',
@@ -46,6 +52,11 @@ export const routes = [
     component: Layout,
     redirect: '/ops/payment',
     children: [
+      {
+        path: 'assistant', name: 'RiskAssistant',
+        component: () => import('@/views/ops/RiskAssistant.vue'),
+        meta: { title: 'AI 风控助手', icon: 'ChatDotRound', group: '一体化智能支撑', permission: 'engine:task:manage' }
+      },
       {
         path: 'payment',
         name: 'OpsPayment',
@@ -91,6 +102,11 @@ export const routes = [
     component: Layout,
     redirect: '/engine/tasks',
     children: [
+      {
+        path: 'privacy', name: 'PrivacyNoise',
+        component: () => import('@/views/engine/PrivacyNoise.vue'),
+        meta: { title: '加噪隐私处理', icon: 'Lock', group: '隐私计算', permission: 'budget:manage' }
+      },
       {
         path: 'tasks',
         name: 'EngineTasks',

@@ -1,4 +1,4 @@
-# FedShield 后端依赖（Python 3.10+）
+# FedShield 后端依赖（Python 3.12 / 3.13）
 # 安装：pip install -r requirements.txt
 # 说明：SQLite 为默认数据库，开箱即用；如需切换 MySQL 请取消注释 PyMySQL 并配置 DATABASE_URL
 
@@ -8,8 +8,15 @@ Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.0.32
 PyJWT==2.9.0
 pycryptodome==3.20.0
-numpy==1.26.4
+numpy==2.5.3
 python-dateutil==2.9.0.post0
+scikit-learn==1.9.1
+openpyxl>=3.1,<4
+requests>=2.32,<3
+PyMuPDF>=1.24,<2
+pyarrow>=18,<24
+pandas>=2.2,<4
+PyMySQL>=1.1,<2
 
 # MySQL / 国产数据库驱动（按需启用）
 # PyMySQL==1.1.1

@@ -77,12 +77,15 @@ def _log(task: ComputeTask, stage: str, message: str, cipher: str = "", level: s
 
 def _run_task(task: ComputeTask) -> dict:
     """按任务类型执行真实计算（同步执行，便于演示与结果可复现）。"""
+    from ..engine import public_dataset
+    if task.type in ('federated','statistics','homomorphic') and federated.public_mode() and not public_dataset.available():
+        raise ApiError('真实公开数据库未就绪，请先导入；任务未启动',code=503)
     started = time.perf_counter()
     task.status = "running"
     task.progress = 10
     task.startedAt = now()
     db.session.commit()
-    _log(task, "调度", f"任务 {task.code} 启动，参与节点 {len(task.partners or [])} 个", cipher="TLS1.3")
+    _log(task, "调度", f"任务 {task.code} 启动，参与节点 {len(task.partners or [])} 个", cipher="本地执行" if federated.public_mode() else "TLS1.3")
     db.session.commit()
 
     result: dict = {}
@@ -100,7 +103,8 @@ def _run_task(task: ComputeTask) -> dict:
             epsilon=float(task.epsilon or 2.0),
             algorithm=task.algorithm or "fedavg",
             local_epochs=int((task.hyper or {}).get("localEpochs", 10)),
-            lr=float((task.hyper or {}).get("lr", 0.08)),
+            lr=float((task.hyper or {}).get("lr", (task.hyper or {}).get('learningRate',0.08))),
+            quantize=(task.hyper or {}).get('quantization',True) is True,
         )
         _log(
             task, "密文聚合",
@@ -134,6 +138,7 @@ def _run_task(task: ComputeTask) -> dict:
             epsilon=float(task.epsilon or 1.5),
             dimension=(task.hyper or {}).get("dimension", "region"),
         )
+        if public_dataset.available():result['dataSource']={'datasetId':'uci-online-retail-352','target':'客户地区订单统计','currency':'GBP','scope':'本地按客户地区分组，非生产多方网络'}
         _log(task, "密文求和", f"密文域求和完成，误差率 {result['errorRate'] * 100:.4f}%", cipher="Paillier")
 
     elif task_type == "psi":
@@ -145,8 +150,8 @@ def _run_task(task: ComputeTask) -> dict:
         _log(task, "隐私求交", f"交集大小 {result['intersectionSize']}", cipher="RSA 盲签名")
 
     else:  # homomorphic：密文域风险评估
-        transactions = Transaction.query.limit(2000).all()
-        amounts = [float(item.amount or 0) for item in transactions]
+        transactions = _statistics_transactions(task)[:2000]
+        amounts = [float(item['amount']) for item in transactions]
         protected = policy.protect_vector("P1", amounts)
         ciphertexts = [policy.default_cipher().deserialize(token) for token in protected["ciphertexts"]]
         cipher = policy.default_cipher()
@@ -160,14 +165,9 @@ def _run_task(task: ComputeTask) -> dict:
             "sum": round(total, 2),
             "plainSum": round(sum(amounts), 2),
             "errorRate": round(abs(total - sum(amounts)) / (sum(amounts) or 1), 8),
-            "riskDistribution": _risk_distribution(transactions),
-            "metrics": {
-                "auc": 0.89,
-                "missRate": 0.068,
-                "precision": 0.36,
-                "alertVolume": 0.22,
-                "note": "同态加密密文域风险评估（模型权重在密文域参与计算）",
-            },
+            "riskDistribution": [],
+            "metrics": {},
+            "dataSource": {'datasetId':'uci-online-retail-352','target':'订单金额同态求和，非风险模型评估','currency':'GBP'} if public_dataset.available() else {'datasetId':'synthetic-test-fixture'},
         }
         _log(task, "密文计算", f"完成 {len(ciphertexts)} 项密文求和，误差率 {result['errorRate']}", cipher="Paillier")
 
@@ -179,9 +179,9 @@ def _run_task(task: ComputeTask) -> dict:
     result["resource"].update(
         {
             "elapsedMs": round(elapsed_ms, 2),
-            "cpuSec": round(elapsed_ms / 1000 * 0.92, 2),
-            "memoryMb": 256 + len(task.partners or []) * 32,
-            "networkMb": 12.6,
+            "cpuSec": None,
+            "memoryMb": None,
+            "networkMb": None,
         }
     )
     task.result = result
@@ -209,8 +209,23 @@ def _has_user() -> bool:
     return getattr(g, "user", None) is not None
 
 
+def _public_statistics_rows(regions=None,start=None,end=None):
+    from ..engine import public_dataset
+    if not public_dataset.available():raise ApiError('真实公开数据库未就绪，不回退模拟交易',code=503)
+    rows=public_dataset.orders()[0];seen=set();result=[]
+    for row in rows:
+        if regions and row['destRegion'] not in regions:continue
+        date=row['occurredAt'][:10]
+        if start and date<start[:10]:continue
+        if end and date>end[:10]:continue
+        identity=(row['destRegion'],row['customerId']);first=bool(row['customerId']) and identity not in seen;seen.add(identity)
+        result.append({'region':row['destRegion'],'amount':row['amount'],'currency':row['currency'],'category':row['category'],'counterparties':int(first),'level':'P2'})
+    if not result:raise ApiError('所选范围无公开订单；数据日期为2010-12-01至2011-12-09，地区按客户国家分组',code=400)
+    return result
+
 def _statistics_transactions(task: ComputeTask) -> list[dict]:
     """按任务参数筛选统计用交易数据。"""
+    if federated.public_mode():return _public_statistics_rows((task.hyper or {}).get('regions'))
     query = Transaction.query
     regions = (task.hyper or {}).get("regions")
     if regions:
@@ -317,11 +332,10 @@ def task_detail(task_id: int):
         "epsilon": task.epsilon,
         "algorithm": task.algorithm,
         "models": [
-            {"name": "逻辑回归（联合风控基线）", "auc": (result.get("metrics") or {}).get("auc")},
-            {"name": "XGBoost 梯度提升树（联邦直方图）", "auc": 0.89},
+            {"name": "联邦逻辑回归 · "+(result.get('dataSource') or {}).get('target','历史基线'), "auc": (result.get("metrics") or {}).get("auc")},
         ],
     }
-    data["resource"] = result.get("resource") or task.resource or {}
+    data["resource"] = {**(result.get("resource") or task.resource or {}), 'cpuSec':None,'memoryMb':None,'networkMb':None}
     data["summary"] = {
         "auc": (result.get("metrics") or {}).get("auc"),
         "missRate": (result.get("metrics") or {}).get("missRate"),
@@ -347,11 +361,17 @@ def start_task(task_id: int):
     # 合规前置校验：P1 数据集参与计算时必须有生效授权
     datasets = Dataset.query.filter(Dataset.code.in_(task.datasets or [])).all()
     p1 = [item.code for item in datasets if item.level == "P1"]
-    if p1 and not (task.hyper or {}).get("grantConfirmed"):
-        _log(task, "合规校验", f"P1 级数据集 {p1} 需确认已获得授权（grantConfirmed）", level="warning")
-        db.session.commit()
+    if task.type=='federated' and federated.public_mode():p1=['实际使用的UCI公开数据源']
+    if p1 and (task.hyper or {}).get("grantConfirmed") is not True:
+        raise ApiError('P1数据集须先确认处理授权及使用许可，任务未启动',code=409)
 
-    _run_task(task)
+    try:
+        _run_task(task)
+    except Exception:
+        db.session.rollback()
+        if task.status=='running':
+            task.status='failed';db.session.commit()
+        raise
     audit_logger.record_from_request(
         "task.start", target=task.code, node=(task.partners or [""])[0], operation="启动",
         detail=f"启动任务 {task.name}",
@@ -442,7 +462,7 @@ def task_result(task_id: int):
         raise ApiError("任务不存在", code=404)
     if not task.result:
         raise ApiError("该任务尚未产生计算结果，请先启动任务", code=409)
-    return ok({**task.result, "taskCode": task.code, "taskName": task.name, "type": task.type})
+    return ok({**task.result, 'resource':{**(task.result.get('resource') or {}),'cpuSec':None,'memoryMb':None,'networkMb':None}, "taskCode": task.code, "taskName": task.name, "type": task.type})
 
 
 @bp.get("/tasks/<int:task_id>/preview")
@@ -503,6 +523,8 @@ def export_task(task_id: int):
 def federated_training():
     """跨境电商联合风控建模（横向联邦 + 差分隐私 + 同态聚合）。"""
     payload = body()
+    if federated.public_mode() and payload.get('grantConfirmed') is not True:
+        raise ApiError('实际训练使用UCI数据，须先确认处理授权及使用许可（grantConfirmed=true）',code=409)
     codes = payload.get("nodes") or [item.code for item in _default_nodes()]
     nodes = federated.build_nodes(codes, _node_meta(codes))
     if not nodes:
@@ -566,31 +588,35 @@ def oblivious_query():
 def joint_statistics():
     """全球交易联合统计。"""
     payload = body()
-    regions = payload.get("regions")
-    query = Transaction.query
-    if regions:
-        query = query.filter(Transaction.region.in_(regions))
-    start = payload.get("startDate")
-    end = payload.get("endDate")
-    if start:
-        query = query.filter(Transaction.occurredAt >= datetime.strptime(start[:10], "%Y-%m-%d"))
-    if end:
-        query = query.filter(Transaction.occurredAt <= datetime.strptime(end[:10], "%Y-%m-%d").replace(hour=23))
-    rows = query.limit(6000).all()
-    if not rows:
-        raise ApiError("没有可用于统计的交易数据", code=400)
-
-    transactions = [
-        {"region": item.region, "amount": item.amount, "category": item.category,
-         "counterparties": item.counterparties, "level": item.level}
-        for item in rows
-    ]
+    if federated.public_mode():
+        transactions=_public_statistics_rows(payload.get('regions'),payload.get('startDate'),payload.get('endDate'))
+    else:
+        regions = payload.get("regions")
+        query = Transaction.query
+        if regions:
+            query = query.filter(Transaction.region.in_(regions))
+        start = payload.get("startDate")
+        end = payload.get("endDate")
+        if start:
+            query = query.filter(Transaction.occurredAt >= datetime.strptime(start[:10], "%Y-%m-%d"))
+        if end:
+            query = query.filter(Transaction.occurredAt <= datetime.strptime(end[:10], "%Y-%m-%d").replace(hour=23))
+        rows = query.limit(6000).all()
+        if not rows:
+            raise ApiError("没有可用于统计的交易数据", code=400)
+    
+        transactions = [
+            {"region": item.region, "amount": item.amount, "category": item.category,
+             "counterparties": item.counterparties, "level": item.level}
+            for item in rows
+        ]
     result = joint_stats.joint_statistics(
         transactions,
         epsilon=float(payload.get("epsilon") or 1.5),
         sensitivity=float(payload.get("sensitivity") or 1000.0),
         dimension=payload.get("dimension") or "region",
     )
+    if federated.public_mode():result['dataSource']={'datasetId':'uci-online-retail-352','target':'客户地区订单统计','currency':'GBP'}
     result["reportRows"] = joint_stats.build_report_rows(result)
     evidence = audit_logger.record_from_request(
         "data.transfer", target="joint-stats", operation="计算",

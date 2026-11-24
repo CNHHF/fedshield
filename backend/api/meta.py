@@ -188,7 +188,10 @@ def nodes():
 @auth_required
 def datasets():
     """数据集列表（含 P1/P2/P3 分级）。"""
-    return ok([item.to_dict() for item in Dataset.query.order_by(Dataset.level, Dataset.id).all()])
+    from ..engine import public_dataset
+    query=Dataset.query
+    if public_dataset.available():query=query.filter_by(code='UCI-ONLINE-RETAIL-352')
+    return ok([item.to_dict() for item in query.order_by(Dataset.level, Dataset.id).all()])
 
 
 @bp.get("/partners")

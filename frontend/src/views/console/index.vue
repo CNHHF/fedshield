@@ -108,7 +108,7 @@
             <el-alert
               v-for="item in alerts"
               :key="item.code"
-              :type="ALERT_LEVEL[item.level]?.type || 'info'"
+              :type="alertType(item.level)"
               :title="item.title"
               :description="item.content"
               show-icon
@@ -207,6 +207,11 @@ import { ALERT_LEVEL, baseChartOption, formatNumber } from '@/utils/format'
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+
+function alertType(level) {
+  const type = ALERT_LEVEL[level]?.type || 'info'
+  return type === 'danger' ? 'error' : type
+}
 
 const loading = ref(false)
 const trendLoading = ref(false)
@@ -349,9 +354,21 @@ onMounted(async () => {
 .fs-console__alerts {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 300px;
+  gap: 12px;
+  max-height: 420px;
   overflow-y: auto;
+}
+.fs-console__alerts > :deep(.el-alert) {
+  flex: 0 0 auto;
+  align-items: flex-start;
+}
+.fs-console__alerts :deep(.el-alert__content) {
+  flex: 1;
+  min-width: 0;
+}
+.fs-console__alerts :deep(.el-alert__title) {
+  display: block;
+  overflow-wrap: anywhere;
 }
 .fs-console__alert-body {
   font-size: 12px;
@@ -361,6 +378,7 @@ onMounted(async () => {
   margin-top: 6px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .fs-console__module {

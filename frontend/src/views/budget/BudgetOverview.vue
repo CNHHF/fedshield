@@ -18,23 +18,23 @@
       <StatCard
         label="预算总额度"
         :value="formatNumber(overview.total || 0)"
-        unit="元"
+        unit="ε"
         icon="Wallet"
         color="#1f5fd8"
-        tip="各项目隐私预算（ε 折算额度）之和"
+        tip="各项目差分隐私预算 ε 之和"
       />
       <StatCard
         label="已消耗额度"
         :value="formatNumber(overview.used || 0)"
-        unit="元"
+        unit="ε"
         icon="TrendCharts"
         color="#f5a623"
-        :sub="`本月新增消耗 ${formatNumber(overview.monthUsed || 0)} 元`"
+        :sub="`本月新增消耗 ${formatNumber(overview.monthUsed || 0)} ε`"
       />
       <StatCard
         label="剩余额度"
         :value="formatNumber(overview.remaining || 0)"
-        unit="元"
+        unit="ε"
         icon="Coin"
         color="#14a37f"
       />
@@ -78,7 +78,7 @@
       <div class="fs-card">
         <div class="fs-card__header">
           <div class="fs-card__title">近 6 个月预算消耗与占比</div>
-          <span class="fs-muted">柱：额度（元） / 线：消耗占比</span>
+          <span class="fs-muted">柱：额度（ε） / 线：消耗占比</span>
         </div>
         <div class="fs-card__body">
           <ChartBox :option="comboOption" :loading="loading" height="320" empty-text="暂无预算趋势数据" />
@@ -125,7 +125,7 @@
             <template #default="{ row }">{{ categoryLabel(row.category) }}</template>
           </el-table-column>
           <el-table-column label="申请额度" width="150" align="right">
-            <template #default="{ row }">{{ formatNumber(row.amount || 0, 2) }} 元</template>
+            <template #default="{ row }">{{ formatNumber(row.amount || 0, 2) }} ε</template>
           </el-table-column>
           <el-table-column label="状态" width="110">
             <template #default="{ row }">
@@ -196,7 +196,7 @@
             controls-position="right"
             style="width: 100%"
           />
-          <div class="fs-muted fs-mt">单位：元；额度最终以审批后的项目预算为准。</div>
+          <div class="fs-muted fs-mt">单位：ε；额度最终以审批后的项目预算为准。</div>
         </el-form-item>
         <el-form-item label="申请理由" prop="reason">
           <el-input
@@ -327,7 +327,7 @@ const comboOption = computed(() =>
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     xAxis: { type: 'category', data: trend.value.months ?? [], axisTick: { alignWithLabel: true } },
     yAxis: [
-      { type: 'value', name: '额度（元）', axisLine: { show: false } },
+      { type: 'value', name: '额度（ε）', axisLine: { show: false } },
       { type: 'value', name: '消耗占比', min: 0, max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { show: false } }
     ],
     series: [
@@ -357,7 +357,7 @@ const areaOption = computed(() =>
   baseChartOption({
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', boundaryGap: false, data: trend.value.months ?? [] },
-    yAxis: { type: 'value', name: '已消耗（元）' },
+    yAxis: { type: 'value', name: '已消耗（ε）' },
     series: [
       {
         name: '已消耗额度',
@@ -377,7 +377,7 @@ const compositionOption = computed(() => {
     value: Number(item?.value || 0)
   }))
   return baseChartOption({
-    tooltip: { trigger: 'item', formatter: '{b}<br/>预算 {c} 元（{d}%）' },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>预算 {c} ε（{d}%）' },
     legend: { orient: 'vertical', right: 8, top: 'center', icon: 'circle', itemWidth: 10, itemHeight: 10 },
     series: [
       {
@@ -487,7 +487,7 @@ async function submitApplication() {
 async function handleApprove(row) {
   try {
     await ElMessageBox.confirm(
-      `确认通过「${row.project || row.code}」的预算申请（${formatNumber(row.amount || 0, 2)} 元）？通过后将计入项目预算额度。`,
+      `确认通过「${row.project || row.code}」的预算申请（${formatNumber(row.amount || 0, 2)} ε）？通过后将计入项目预算额度。`,
       '预算申请审批',
       { type: 'warning', confirmButtonText: '通过', cancelButtonText: '取消' }
     )
@@ -531,7 +531,7 @@ onMounted(async () => {
     // 预算项目类别来自元数据接口，首次进入时加载
     await appStore.loadMeta()
   } catch (error) {
-    // 元数据失败时下拉框为空，不影响概览展示
+    // ε数据失败时下拉框为空，不影响概览展示
   }
   await load()
 })
